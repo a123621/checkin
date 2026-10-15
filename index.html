@@ -1,0 +1,629 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+<meta name="theme-color" content="#ffffff">
+<title>我的打卡</title>
+<style>
+  /* ==================== ① 基础与变量 ==================== */
+  :root {
+    --theme-rgb: 255, 107, 129;
+    --theme-alpha: 0.85;
+    --theme: rgba(var(--theme-rgb), var(--theme-alpha));
+    --theme-solid: rgb(var(--theme-rgb));
+    --theme-soft: rgba(var(--theme-rgb), 0.15);
+    --theme-glow: rgba(var(--theme-rgb), 0.4);
+    --bg-dim: 0.25;
+    --text-primary: #ffffff;
+    --text-secondary: rgba(255, 255, 255, 0.7);
+    --dot-off: rgba(255, 255, 255, 0.3);
+    --radius-lg: 24px;
+    --radius-md: 18px;
+    --radius-sm: 12px;
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; }
+  html, body { height: 100%; overflow: hidden; }
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, "PingFang SC", "Microsoft YaHei", sans-serif;
+    color: var(--text-primary);
+    background-color: #1a1a1a;
+    display: flex; flex-direction: column; height: 100dvh; position: relative;
+    transition: color 0.3s;
+  }
+
+  /* 背景层 */
+  .bg-layer {
+    position: fixed; top: 0; left: 0; width: 100%; height: 100%; z-index: 0;
+    background-size: cover; background-position: center;
+    transition: background-image 0.3s ease, opacity 0.3s ease;
+    background-repeat: no-repeat;
+  }
+  .bg-dim {
+    position: fixed; top: 0; left: 0; width: 100%; height: 100%; z-index: 1;
+    background: rgba(0,0,0, var(--bg-dim)); pointer-events: none;
+    transition: background 0.3s;
+  }
+
+  /* ==================== ② 布局骨架 ==================== */
+  #app {
+    position: relative; z-index: 2; display: flex; flex-direction: column;
+    height: 100%; width: 100%; max-width: 480px; margin: 0 auto;
+  }
+
+  /* 顶部导航 */
+  .top-nav {
+    padding-top: env(safe-area-inset-top);
+    padding: 16px 20px 10px;
+    display: flex; justify-content: flex-end; align-items: center;
+    position: relative;
+  }
+  .menu-btn {
+    width: 44px; height: 44px; display: flex; align-items: center; justify-content: center;
+    font-size: 24px; cursor: pointer; background: rgba(255,255,255,0.1);
+    border-radius: 50%; border: none; color: var(--text-primary);
+    transition: background 0.2s;
+  }
+  .menu-btn:active { background: rgba(255,255,255,0.25); }
+
+  /* 视图切换 */
+  .view { display: none; flex: 1; flex-direction: column; overflow: hidden; }
+  .view.active { display: flex; }
+
+  /* 首页时间排版 */
+  .home-header { text-align: center; padding: 10px 20px 30px; }
+  #live-time {
+    font-size: 56px; font-weight: 300; letter-spacing: 2px;
+    font-variant-numeric: tabular-nums; line-height: 1.1;
+    text-shadow: 0 4px 16px rgba(0,0,0,0.3);
+  }
+  .poem {
+    font-size: 15px; font-style: italic; color: var(--text-secondary);
+    margin-top: 8px; font-weight: 300; letter-spacing: 1px;
+    text-shadow: 0 2px 8px rgba(0,0,0,0.3);
+  }
+
+  /* 首页导航字 */
+  .home-nav {
+    display: flex; justify-content: center; align-items: center; gap: 16px;
+    padding: 10px 0 20px;
+  }
+  .nav-text {
+    font-size: 18px; cursor: pointer; padding: 8px 12px;
+    transition: transform 0.2s, color 0.2s;
+    text-shadow: 0 2px 8px rgba(0,0,0,0.4); border-radius: 12px;
+  }
+  .nav-text:active { transform: scale(0.92); }
+  .nav-text.active { color: var(--theme-solid); }
+
+  /* 内容区 */
+  .content-area { flex: 1; overflow-y: auto; padding: 0 16px 16px; position: relative; }
+
+  /* 功能页顶部导航 */
+  .func-header {
+    display: flex; justify-content: space-between; align-items: center;
+    padding: 10px 16px; font-size: 16px; font-weight: 600;
+  }
+  .back-btn {
+    background: rgba(255,255,255,0.1); border: none; color: var(--text-primary);
+    width: 36px; height: 36px; border-radius: 50%; font-size: 18px;
+    display: flex; align-items: center; justify-content: center; cursor: pointer;
+  }
+  .back-btn:active { background: rgba(255,255,255,0.3); }
+
+  /* ==================== ③ 日历卡片 ==================== */
+  .calendar-card {
+    background: rgba(255, 255, 255, 0.16);
+    backdrop-filter: blur(20px) saturate(140%);
+    -webkit-backdrop-filter: blur(20px) saturate(140%);
+    border: 1px solid rgba(255, 255, 255, 0.3);
+    border-radius: var(--radius-lg);
+    padding: 12px 14px;
+    margin: 0 auto 16px;
+    width: 100%; max-width: 340px;
+    box-shadow: 0 8px 32px rgba(0,0,0,0.15);
+    cursor: pointer;
+    transition: transform 0.2s, box-shadow 0.2s;
+  }
+  .calendar-card:active { transform: scale(0.98); }
+
+  .cal-header {
+    display: flex; justify-content: space-between; align-items: center;
+    margin-bottom: 8px; padding: 0 4px;
+  }
+  .cal-header span { font-size: 14px; font-weight: 600; letter-spacing: 1px; }
+  .cal-header button {
+    background: none; border: none; color: var(--text-primary);
+    font-size: 18px; padding: 4px 8px; cursor: pointer;
+    border-radius: 8px;
+  }
+  .cal-header button:active { background: rgba(255,255,255,0.2); }
+
+  .cal-grid { display: grid; grid-template-columns: repeat(7, 1fr); gap: 2px; text-align: center; }
+  .cal-week { font-size: 11px; color: var(--text-secondary); margin-bottom: 6px; }
+  
+  .cal-day {
+    display: flex; flex-direction: column; align-items: center; justify-content: center;
+    height: 38px; border-radius: 10px; cursor: pointer;
+    font-size: 13px; font-variant-numeric: tabular-nums;
+    position: relative; transition: background 0.2s;
+  }
+  .cal-day:active { background: rgba(255,255,255,0.15); }
+  .cal-day.not-month { opacity: 0.25; pointer-events: none; }
+  .cal-day.today { border: 1.5px solid var(--theme-solid); }
+  .cal-day.selected { background: var(--theme-solid); color: #fff; }
+  
+  .dots { display: flex; gap: 2px; height: 5px; margin-top: 1px; align-items: center; justify-content: center; }
+  .dot { width: 3px; height: 3px; border-radius: 50%; background: var(--dot-off); }
+  .dot.active { background: var(--theme-solid); }
+  .dot.active.selected { background: #fff; }
+
+  /* ==================== ④ 记录列表 ==================== */
+  .record-card {
+    background: rgba(255, 255, 255, 0.12);
+    border: 1px solid rgba(255, 255, 255, 0.2);
+    border-radius: var(--radius-md);
+    padding: 16px;
+    margin-bottom: 16px;
+    backdrop-filter: blur(10px);
+    -webkit-backdrop-filter: blur(10px);
+  }
+  .record-card h3 { font-size: 15px; margin-bottom: 12px; font-weight: 500; }
+
+  .record-item {
+    display: flex; justify-content: space-between; align-items: center;
+    padding: 8px 0; border-bottom: 1px solid rgba(255,255,255,0.1);
+    font-size: 14px;
+  }
+  .record-item:last-child { border-bottom: none; }
+  .record-left { display: flex; align-items: center; gap: 8px; flex: 1; }
+  .record-name { font-weight: 400; }
+  .record-right { display: flex; align-items: center; gap: 8px; }
+  .record-val { font-weight: 600; color: var(--theme-solid); }
+  .record-del {
+    background: rgba(255,255,255,0.1); border: none; color: var(--text-secondary);
+    padding: 2px 8px; border-radius: 6px; font-size: 11px; cursor: pointer;
+  }
+  .record-del:active { background: #ff3b30; color: #fff; }
+
+  .total-row {
+    display: flex; justify-content: space-between; margin-top: 10px;
+    padding-top: 8px; border-top: 1px solid rgba(255,255,255,0.2);
+    font-weight: 600; color: var(--theme-solid); font-size: 15px;
+  }
+  .sub-total { font-size: 12px; color: var(--text-secondary); text-align: right; margin-top: 2px; }
+
+  /* ==================== ⑤ 可拖动悬浮按钮 ==================== */
+  .fab {
+    position: absolute; right: 20px; bottom: 20px;
+    width: 52px; height: 52px; border-radius: 50%;
+    background: var(--theme-solid); color: #fff;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 28px; font-weight: 300;
+    box-shadow: 0 4px 16px var(--theme-glow);
+    border: none; cursor: pointer; z-index: 50;
+    touch-action: none; /* 允许拖动 */
+    user-select: none;
+    transition: transform 0.1s;
+  }
+  .fab:active { transform: scale(0.95); }
+
+  /* ==================== ⑥ 侧边栏（设置） ==================== */
+  #settings-panel {
+    position: fixed; top: 0; right: 0; width: 300px; height: 100%;
+    z-index: 300; background: rgba(25, 25, 28, 0.96);
+    backdrop-filter: blur(20px); -webkit-backdrop-filter: blur(20px);
+    transform: translateX(100%); transition: transform 0.3s cubic-bezier(0.32, 0.72, 0, 1);
+    display: flex; flex-direction: column; padding: 24px; padding-top: env(safe-area-inset-top);
+    overflow-y: auto;
+  }
+  #settings-panel.open { transform: translateX(0); }
+  .settings-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 24px; }
+  .settings-header h2 { font-size: 18px; color: #fff; }
+  .close-btn { background: rgba(255,255,255,0.1); border: none; color: #fff; width: 36px; height: 36px; border-radius: 50%; font-size: 18px; cursor: pointer; }
+
+  .setting-item { margin-bottom: 20px; }
+  .setting-item label { display: block; font-size: 13px; color: rgba(255,255,255,0.6); margin-bottom: 8px; }
+  .setting-item input[type="text"] { width: 100%; padding: 10px; border-radius: 8px; border: 1px solid rgba(255,255,255,0.2); background: rgba(255,255,255,0.1); color: #fff; font-size: 14px; }
+  .setting-item input[type="color"] { width: 100%; height: 40px; border: none; border-radius: 8px; background: none; cursor: pointer; }
+  .setting-item input[type="range"] { width: 100%; accent-color: var(--theme-solid); }
+  .btn-block { width: 100%; padding: 12px; background: var(--theme-solid); color: #fff; border: none; border-radius: 10px; font-size: 14px; font-weight: 600; cursor: pointer; margin-top: 4px; }
+  .btn-secondary { background: rgba(255,255,255,0.12); color: #fff; }
+
+  /* ==================== ⑦ 其他 ==================== */
+  .view-switch-overlay {
+    position: fixed; inset: 0; background: #1a1a1a; z-index: 100;
+    pointer-events: none; opacity: 0; transition: opacity 0.3s;
+  }
+  ::-webkit-scrollbar { display: none; }
+</style>
+</head>
+<body>
+
+<!-- 背景层（全局默认，实际上各视图会覆盖自己的背景） -->
+<div class="bg-layer" id="bg-layer"></div>
+<div class="bg-dim"></div>
+
+<div id="app">
+  <!-- 顶部菜单按钮 -->
+  <div class="top-nav">
+    <button class="menu-btn" onclick="App.toggleSettings()">☰</button>
+  </div>
+
+  <!-- ================= 首页 ================= -->
+  <div id="view-home" class="view active">
+    <div class="home-header">
+      <div id="live-time">--:--</div>
+      <div class="poem">需要等待的 其实永远都不会来</div>
+    </div>
+    <div class="home-nav">
+      <div class="nav-text" onclick="App.switchView('sport')">𝙎𝙥𝙤𝙧𝙩</div>
+      <div class="nav-text" onclick="App.switchView('shopping')">ᜊ( 𖦹 ˕ 𖦹 )ᜊ</div>
+      <div class="nav-text" onclick="App.switchView('diet')">𝘿𝙞𝙚𝙩</div>
+    </div>
+    <div class="content-area" style="flex:1; display: flex; align-items: flex-end; padding-bottom: 20px;">
+      <div class="calendar-card" onclick="App.changeBg('home')" id="home-calendar">
+        <div class="cal-header">
+          <button onclick="event.stopPropagation(); App.changeMonth(-1)">‹</button>
+          <span id="cal-month-label-home">2026年10月</span>
+          <button onclick="event.stopPropagation(); App.changeMonth(1)">›</button>
+        </div>
+        <div class="cal-grid cal-week"><span>一</span><span>二</span><span>三</span><span>四</span><span>五</span><span>六</span><span>日</span></div>
+        <div class="cal-grid" id="cal-days-home"></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ================= 运动页 ================= -->
+  <div id="view-sport" class="view">
+    <div class="func-header">
+      <button class="back-btn" onclick="App.switchView('home')">←</button>
+      <span>𝙎𝙥𝙤𝙧𝙩</span>
+      <div style="width:36px;"></div>
+    </div>
+    <div class="content-area">
+      <div class="calendar-card" onclick="App.changeBg('sport')" id="sport-calendar">
+        <div class="cal-header">
+          <button onclick="event.stopPropagation(); App.changeMonth(-1)">‹</button>
+          <span id="cal-month-label-sport">2026年10月</span>
+          <button onclick="event.stopPropagation(); App.changeMonth(1)">›</button>
+        </div>
+        <div class="cal-grid cal-week"><span>一</span><span>二</span><span>三</span><span>四</span><span>五</span><span>六</span><span>日</span></div>
+        <div class="cal-grid" id="cal-days-sport"></div>
+      </div>
+      <div class="record-card">
+        <h3 id="sport-date-title">10月15日 周三</h3>
+        <div id="sport-list"></div>
+        <div class="total-row"><span>当日合计</span><span id="sport-day-total">0 kcal</span></div>
+        <div class="sub-total" id="sport-week-total">本周合计: 0 kcal</div>
+      </div>
+    </div>
+    <button class="fab" data-module="sport" onpointerdown="App.startDrag(event)" onclick="App.openSheet('sport')">+</button>
+  </div>
+
+  <!-- ================= 购物页 ================= -->
+  <div id="view-shopping" class="view">
+    <div class="func-header">
+      <button class="back-btn" onclick="App.switchView('home')">←</button>
+      <span>ᜊ( 𖦹 ˕ 𖦹 )ᜊ</span>
+      <div style="width:36px;"></div>
+    </div>
+    <div class="content-area">
+      <div class="calendar-card" onclick="App.changeBg('shopping')" id="shopping-calendar">
+        <div class="cal-header">
+          <button onclick="event.stopPropagation(); App.changeMonth(-1)">‹</button>
+          <span id="cal-month-label-shopping">2026年10月</span>
+          <button onclick="event.stopPropagation(); App.changeMonth(1)">›</button>
+        </div>
+        <div class="cal-grid cal-week"><span>一</span><span>二</span><span>三</span><span>四</span><span>五</span><span>六</span><span>日</span></div>
+        <div class="cal-grid" id="cal-days-shopping"></div>
+      </div>
+      <div class="record-card">
+        <h3 id="shopping-date-title">10月15日 周三</h3>
+        <div id="shopping-list"></div>
+        <div class="total-row"><span>当日合计</span><span id="shopping-day-total">¥0.00</span></div>
+      </div>
+    </div>
+    <button class="fab" data-module="shopping" onpointerdown="App.startDrag(event)" onclick="App.openSheet('shopping')">+</button>
+  </div>
+
+  <!-- ================= 饮食页 ================= -->
+  <div id="view-diet" class="view">
+    <div class="func-header">
+      <button class="back-btn" onclick="App.switchView('home')">←</button>
+      <span>𝘿𝙞𝙚𝙩</span>
+      <div style="width:36px;"></div>
+    </div>
+    <div class="content-area">
+      <div class="calendar-card" onclick="App.changeBg('diet')" id="diet-calendar">
+        <div class="cal-header">
+          <button onclick="event.stopPropagation(); App.changeMonth(-1)">‹</button>
+          <span id="cal-month-label-diet">2026年10月</span>
+          <button onclick="event.stopPropagation(); App.changeMonth(1)">›</button>
+        </div>
+        <div class="cal-grid cal-week"><span>一</span><span>二</span><span>三</span><span>四</span><span>五</span><span>六</span><span>日</span></div>
+        <div class="cal-grid" id="cal-days-diet"></div>
+      </div>
+      <div class="record-card">
+        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:12px;">
+          <h3 id="diet-date-title" style="margin-bottom:0;">10月15日 周三</h3>
+          <span style="font-size:12px; background:var(--theme-soft); color:var(--theme-solid); padding:4px 8px; border-radius:12px;" id="diet-month-stat">本月饮料 0 次</span>
+        </div>
+        <div id="diet-list"></div>
+        <div class="total-row"><span>当日合计</span><span id="diet-day-total">¥0.00</span></div>
+        <div class="sub-total" id="diet-week-total">本周合计: ¥0.00</div>
+      </div>
+    </div>
+    <button class="fab" data-module="diet" onpointerdown="App.startDrag(event)" onclick="App.openSheet('diet')">+</button>
+  </div>
+</div>
+
+<!-- ================= 侧边栏设置 ================= -->
+<div id="settings-panel">
+  <div class="settings-header">
+    <h2>⚙️ 设置</h2>
+    <button class="close-btn" onclick="App.toggleSettings()">✕</button>
+  </div>
+
+  <div class="setting-item">
+    <label>主题颜色（可粘贴色号）</label>
+    <input type="text" id="theme-hex-input" placeholder="#ff6b81" value="#ff6b81">
+    <input type="color" id="theme-color-picker" value="#ff6b81" style="margin-top:8px;">
+  </div>
+
+  <div class="setting-item">
+    <label>背景压暗程度 (0-100%)</label>
+    <input type="range" id="bg-dim-slider" min="0" max="0.6" step="0.05" value="0.25">
+  </div>
+
+  <div class="setting-item">
+    <label>更换当前页壁纸</label>
+    <button class="btn-block btn-secondary" onclick="document.getElementById('bg-upload').click()">📷 选择图片</button>
+    <input type="file" id="bg-upload" accept="image/*" style="display:none">
+  </div>
+
+  <div class="setting-item" style="margin-top: 30px;">
+    <button class="btn-block btn-secondary" onclick="App.exportData()">📤 导出 JSON 备份</button>
+  </div>
+  <div class="setting-item">
+    <button class="btn-block btn-secondary" onclick="document.getElementById('import-file').click()">📥 导入 JSON 备份</button>
+    <input type="file" id="import-file" accept=".json" style="display:none">
+  </div>
+</div>
+
+<script>
+// ==================== ① CONFIG ====================
+const STORAGE_KEYS = {
+  settings: 'ck_settings_v1',
+  records: 'ck_records_v1',
+  suggest: 'ck_suggest_v1',
+  bg: 'ck_bg_v1'
+};
+
+// ==================== ② Util ====================
+const Util = {
+  formatDateKey(d) {
+    const y = d.getFullYear();
+    const m = String(d.getMonth() + 1).padStart(2, '0');
+    const day = String(d.getDate()).padStart(2, '0');
+    return `${y}-${m}-${day}`;
+  },
+  parseDateKey(str) {
+    const [y, m, d] = str.split('-').map(Number);
+    return new Date(y, m - 1, d);
+  },
+  getWeekRange(dateStr) {
+    const d = this.parseDateKey(dateStr);
+    const day = d.getDay() || 7;
+    const monday = new Date(d);
+    monday.setDate(d.getDate() - day + 1);
+    const range = [];
+    for (let i = 0; i < 7; i++) {
+      const dd = new Date(monday);
+      dd.setDate(monday.getDate() + i);
+      range.push(this.formatDateKey(dd));
+    }
+    return range;
+  },
+  formatMoney(n) { return '¥' + n.toFixed(2); }
+};
+
+// ==================== ③ Store ====================
+const Store = {
+  data: { records: { sport: {}, shopping: {}, diet: {} }, suggest: { sport: {}, shopping: {}, diet: {} } },
+  
+  load() {
+    try {
+      const rec = localStorage.getItem(STORAGE_KEYS.records);
+      if (rec) this.data.records = JSON.parse(rec);
+    } catch (e) { console.error('加载数据失败', e); }
+  },
+  
+  saveRecords() {
+    try { localStorage.setItem(STORAGE_KEYS.records, JSON.stringify(this.data.records)); } catch (e) { alert('存储空间不足'); }
+  },
+  
+  addRecord(module, dateKey, record) {
+    if (!this.data.records[module][dateKey]) this.data.records[module][dateKey] = [];
+    this.data.records[module][dateKey].push(record);
+    this.saveRecords();
+  },
+  
+  deleteRecord(module, dateKey, id) {
+    const list = this.data.records[module][dateKey];
+    if (!list) return;
+    const idx = list.findIndex(r => r.id === id);
+    if (idx > -1) {
+      list.splice(idx, 1);
+      if (list.length === 0) delete this.data.records[module][dateKey];
+      this.saveRecords();
+    }
+  }
+};
+
+// ==================== ④ Theme ====================
+const Theme = {
+  settings: { themeRGB: '255, 107, 129', themeAlpha: 0.85, bgDim: 0.25 },
+  
+  load() {
+    try {
+      const s = localStorage.getItem(STORAGE_KEYS.settings);
+      if (s) this.settings = { ...this.settings, ...JSON.parse(s) };
+    } catch(e) {}
+    this.apply();
+  },
+  
+  save() {
+    try { localStorage.setItem(STORAGE_KEYS.settings, JSON.stringify(this.settings)); } catch(e) {}
+  },
+  
+  apply() {
+    const root = document.documentElement.style;
+    root.setProperty('--theme-rgb', this.settings.themeRGB);
+    root.setProperty('--theme-alpha', this.settings.themeAlpha);
+    root.setProperty('--bg-dim', this.settings.bgDim);
+  },
+  
+  setThemeFromHex(hex) {
+    const rgb = this.hexToRgb(hex);
+    if (rgb) {
+      this.settings.themeRGB = `${rgb.r}, ${rgb.g}, ${rgb.b}`;
+      this.apply(); this.save();
+    }
+  },
+  
+  hexToRgb(hex) {
+    const result = /^#?([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i.exec(hex);
+    return result ? { r: parseInt(result[1], 16), g: parseInt(result[2], 16), b: parseInt(result[3], 16) } : null;
+  },
+  
+  rgbToHex(rgbStr) {
+    const [r, g, b] = rgbStr.split(',').map(n => parseInt(n.trim()));
+    return '#' + [r, g, b].map(n => n.toString(16).padStart(2, '0')).join('');
+  }
+};
+
+// ==================== ⑤ Background ====================
+const Background = {
+  bgs: { home: '', sport: '', shopping: '', diet: '' },
+  currentView: 'home',
+  
+  load() {
+    try {
+      const saved = localStorage.getItem(STORAGE_KEYS.bg);
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        if (typeof parsed === 'string') { this.bgs.home = parsed; } // 兼容旧数据
+        else { this.bgs = { ...this.bgs, ...parsed }; }
+      }
+    } catch(e) {}
+    this.applyBg();
+  },
+  
+  save() {
+    try { localStorage.setItem(STORAGE_KEYS.bg, JSON.stringify(this.bgs)); } catch(e) { alert('壁纸太大，保存失败'); }
+  },
+  
+  applyBg() {
+    const bg = this.bgs[this.currentView] || '';
+    document.getElementById('bg-layer').style.backgroundImage = bg ? `url(${bg})` : '';
+  },
+  
+  setBg(view, dataURL) {
+    this.bgs[view] = dataURL;
+    this.save();
+    this.applyBg();
+  }
+};
+
+// ==================== ⑥ Calendar ====================
+const Calendar = {
+  currentMonth: new Date(),
+  selectedDate: Util.formatDateKey(new Date()),
+  
+  init() { this.renderAll(); },
+  
+  changeMonth(delta) {
+    this.currentMonth.setMonth(this.currentMonth.getMonth() + delta);
+    this.renderAll();
+  },
+  
+  renderAll() {
+    ['home', 'sport', 'shopping', 'diet'].forEach(v => this.renderGrid(v));
+    App.updateDietStat();
+    App.refreshRecords();
+  },
+  
+  renderGrid(viewId) {
+    const y = this.currentMonth.getFullYear();
+    const m = this.currentMonth.getMonth();
+    const label = document.getElementById('cal-month-label-' + viewId);
+    if (label) label.innerText = `${y}年${m + 1}月`;
+    
+    const firstDay = new Date(y, m, 1);
+    const daysInMonth = new Date(y, m + 1, 0).getDate();
+    let startDay = firstDay.getDay();
+    startDay = startDay === 0 ? 7 : startDay;
+    
+    const grid = document.getElementById('cal-days-' + viewId);
+    if (!grid) return;
+    grid.innerHTML = '';
+    const fragment = document.createDocumentFragment();
+    
+    for (let i = 1; i < startDay; i++) {
+      const div = document.createElement('div'); div.className = 'cal-day not-month'; fragment.appendChild(div);
+    }
+    
+    const todayStr = Util.formatDateKey(new Date());
+    
+    for (let d = 1; d <= daysInMonth; d++) {
+      const dateKey = `${y}-${String(m + 1).padStart(2, '0')}-${String(d).padStart(2, '0')}`;
+      const div = document.createElement('div');
+      div.className = 'cal-day';
+      if (dateKey === todayStr) div.classList.add('today');
+      if (dateKey === this.selectedDate) div.classList.add('selected');
+      
+      const num = document.createElement('span'); num.innerText = d; div.appendChild(num);
+      
+      const dotsDiv = document.createElement('div'); dotsDiv.className = 'dots';
+      const hasSport = Store.data.records.sport[dateKey] && Store.data.records.sport[dateKey].length > 0;
+      const hasShop = Store.data.records.shopping[dateKey] && Store.data.records.shopping[dateKey].length > 0;
+      const hasDiet = Store.data.records.diet[dateKey] && Store.data.records.diet[dateKey].length > 0;
+      
+      if (hasSport || hasShop || hasDiet) {
+        if (hasSport) dotsDiv.appendChild(this.makeDot(dateKey === this.selectedDate));
+        if (hasShop) dotsDiv.appendChild(this.makeDot(dateKey === this.selectedDate));
+        if (hasDiet) dotsDiv.appendChild(this.makeDot(dateKey === this.selectedDate));
+      } else {
+        dotsDiv.appendChild(this.makeDot(false, true));
+      }
+      div.appendChild(dotsDiv);
+      
+      // 点击数字：只更新选中日期，不换背景
+      div.onclick = (e) => {
+        e.stopPropagation(); // 阻止冒泡到日历卡片的换背景
+        this.selectedDate = dateKey;
+        this.renderAll();
+      };
+      
+      fragment.appendChild(div);
+    }
+    
+    grid.appendChild(fragment);
+  },
+  
+  makeDot(isSelected, isOff = false) {
+    const dt = document.createElement('div');
+    dt.className = 'dot' + (isOff ? '' : ' active') + (isSelected ? ' selected' : '');
+    return dt;
+  }
+};
+
+// ==================== ⑦ App ====================
+const App = {
+  currentView: 'home',
+  dragState: { active: false, startX: 0, startY: 0, initialLeft: 0, initialTop: 0, moved: false },
+  
+  init() {
+    Theme.load();
