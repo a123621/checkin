@@ -1,0 +1,229 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>我的打卡</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; }
+  body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; background-color: #f5f5f7; color: #333; padding-bottom: 70px; }
+  #bg-layer { position: fixed; top:0; left:0; width:100%; height:100%; z-index:-1; background-size: cover; background-position: center; opacity: 0.4; }
+  header { padding: 20px 15px; text-align: center; }
+  header h1 { font-size: 22px; font-weight: 600; }
+  header p { font-size: 13px; color: #666; margin-top: 5px; }
+  .container { padding: 0 15px; max-width: 600px; margin: 0 auto; }
+  .card { background: rgba(255,255,255,0.9); border-radius: 16px; padding: 15px; margin-bottom: 15px; box-shadow: 0 4px 12px rgba(0,0,0,0.05); backdrop-filter: blur(5px); }
+  .card h2 { font-size: 16px; margin-bottom: 12px; display: flex; justify-content: space-between; align-items: center; }
+  .input-group { display: flex; gap: 8px; margin-bottom: 10px; }
+  input, select { flex: 1; padding: 10px; border: 1px solid #ddd; border-radius: 8px; font-size: 14px; outline: none; }
+  button.add-btn { background: #007aff; color: #fff; border: none; padding: 10px 16px; border-radius: 8px; font-size: 14px; font-weight: 600; }
+  .list-item { display: flex; justify-content: space-between; align-items: center; padding: 10px 0; border-bottom: 1px solid #eee; font-size: 14px; }
+  .list-item:last-child { border-bottom: none; }
+  .list-item .del { color: #ff3b30; font-size: 12px; padding: 4px 8px; background: #fff0f0; border-radius: 6px; border: none; }
+  .total { text-align: right; font-weight: bold; font-size: 15px; margin-top: 10px; color: #007aff; }
+  .empty { text-align: center; color: #999; font-size: 13px; padding: 20px 0; }
+  
+  /* 底部导航 */
+  .tab-bar { position: fixed; bottom: 0; left: 0; width: 100%; height: 60px; background: rgba(255,255,255,0.95); display: flex; border-top: 1px solid #e5e5e5; backdrop-filter: blur(10px); z-index: 100; }
+  .tab-item { flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; font-size: 11px; color: #999; gap: 3px; }
+  .tab-item.active { color: #007aff; font-weight: 600; }
+  .tab-item span { font-size: 20px; }
+  .tab-content { display: none; }
+  .tab-content.active { display: block; }
+
+  /* 背景设置浮窗 */
+  .settings-btn { position: absolute; top: 20px; right: 15px; background: rgba(255,255,255,0.8); border: none; width: 36px; height: 36px; border-radius: 50%; font-size: 18px; display: flex; align-items: center; justify-content: center; box-shadow: 0 2px 8px rgba(0,0,0,0.1); }
+</style>
+</head>
+<body>
+
+<div id="bg-layer"></div>
+
+<header style="position: relative;">
+  <h1 id="today-date">加载中...</h1>
+  <p>保持记录，遇见更好的自己</p>
+  <button class="settings-btn" onclick="document.getElementById('bg-upload').click()">⚙️</button>
+  <input type="file" id="bg-upload" accept="image/*" style="display:none">
+</header>
+
+<div class="container">
+
+  <!-- 💪 运动打卡 -->
+  <div id="tab-sport" class="tab-content active">
+    <div class="card">
+      <h2>💪 运动打卡</h2>
+      <div class="input-group">
+        <input type="text" id="sport-name" placeholder="项目 (如: 跑步)">
+        <input type="number" id="sport-cal" placeholder="大卡" style="max-width: 80px;">
+        <button class="add-btn" onclick="addSport()">+</button>
+      </div>
+      <div id="sport-list"></div>
+      <div class="total" id="sport-total">今日消耗: 0 大卡</div>
+    </div>
+    <div class="card">
+      <h2>📅 运动日历 (本月)</h2>
+      <div id="sport-calendar" style="display: grid; grid-template-columns: repeat(7, 1fr); gap: 5px; text-align: center; font-size: 12px;"></div>
+    </div>
+  </div>
+
+  <!-- 🍚 饮食记录 -->
+  <div id="tab-food" class="tab-content">
+    <div class="card">
+      <h2>🍚 饮食记录</h2>
+      <div class="input-group">
+        <input type="text" id="food-name" placeholder="菜品 (如: 麻辣烫)">
+        <input type="number" id="food-price" placeholder="价格 ¥" style="max-width: 80px;">
+        <button class="add-btn" onclick="addFood()">+</button>
+      </div>
+      <div id="food-list"></div>
+      <div class="total" id="food-total">今日合计: ¥0</div>
+    </div>
+  </div>
+
+  <!-- 🛍️ 购物记录 -->
+  <div id="tab-shop" class="tab-content">
+    <div class="card">
+      <h2>🛍️ 购物记录</h2>
+      <div class="input-group">
+        <input type="text" id="shop-name" placeholder="物品 (如: 洗发水)">
+        <input type="number" id="shop-price" placeholder="价格 ¥" style="max-width: 80px;">
+        <button class="add-btn" onclick="addShop()">+</button>
+      </div>
+      <div id="shop-list"></div>
+      <div class="total" id="shop-total">本月合计: ¥0</div>
+    </div>
+  </div>
+
+</div>
+
+<!-- 底部导航 -->
+<div class="tab-bar">
+  <div class="tab-item active" onclick="switchTab('sport')"><span>💪</span>运动</div>
+  <div class="tab-item" onclick="switchTab('food')"><span>🍚</span>饮食</div>
+  <div class="tab-item" onclick="switchTab('shop')"><span>🛍️</span>购物</div>
+</div>
+
+<script>
+  // --- 1. 初始化日期 ---
+  const today = new Date();
+  const dateStr = `${today.getFullYear()}年${today.getMonth()+1}月${today.getDate()}日`;
+  document.getElementById('today-date').innerText = dateStr;
+
+  // --- 2. 数据存储 ---
+  let data = JSON.parse(localStorage.getItem('myCheckinData')) || { sports: [], foods: [], shops: [], bg: '' };
+  
+  function save() { localStorage.setItem('myCheckinData', JSON.stringify(data)); renderAll(); }
+
+  // --- 3. 背景上传 ---
+  const bgUpload = document.getElementById('bg-upload');
+  bgUpload.addEventListener('change', function(e) {
+    const file = e.target.files[0];
+    if (file) {
+      const reader = new FileReader();
+      reader.onload = function(evt) {
+        data.bg = evt.target.result;
+        save();
+      };
+      reader.readAsDataURL(file);
+    }
+  });
+
+  if (data.bg) { document.getElementById('bg-layer').style.backgroundImage = `url(${data.bg})`; }
+
+  // --- 4. 切换 Tab ---
+  function switchTab(tab) {
+    document.querySelectorAll('.tab-content').forEach(el => el.classList.remove('active'));
+    document.querySelectorAll('.tab-item').forEach(el => el.classList.remove('active'));
+    document.getElementById('tab-' + tab).classList.add('active');
+    event.currentTarget.classList.add('active');
+  }
+
+  // --- 5. 运动打卡 ---
+  function addSport() {
+    const name = document.getElementById('sport-name').value.trim();
+    const cal = parseFloat(document.getElementById('sport-cal').value);
+    if (!name || isNaN(cal)) return alert('请输入项目和消耗大卡');
+    data.sports.push({ date: dateStr, name, cal });
+    document.getElementById('sport-name').value = '';
+    document.getElementById('sport-cal').value = '';
+    save();
+  }
+  function delSport(index) {
+    data.sports.splice(index, 1);
+    save();
+  }
+
+  // --- 6. 饮食记录 ---
+  function addFood() {
+    const name = document.getElementById('food-name').value.trim();
+    const price = parseFloat(document.getElementById('food-price').value);
+    if (!name || isNaN(price)) return alert('请输入菜品和价格');
+    data.foods.push({ date: dateStr, name, price });
+    document.getElementById('food-name').value = '';
+    document.getElementById('food-price').value = '';
+    save();
+  }
+  function delFood(index) { data.foods.splice(index, 1); save(); }
+
+  // --- 7. 购物记录 ---
+  function addShop() {
+    const name = document.getElementById('shop-name').value.trim();
+    const price = parseFloat(document.getElementById('shop-price').value);
+    if (!name || isNaN(price)) return alert('请输入物品和价格');
+    data.shops.push({ date: dateStr, name, price });
+    document.getElementById('shop-name').value = '';
+    document.getElementById('shop-price').value = '';
+<
+}函数delShop函数delShopindex项目日期数据.商店.褶皱(index，1)；保存()；}如果(项目.日期==日期str){如果(项目.日期==日期str){(.date===dateStr){if(项目。date===dateStr){(项目。日期==日期str){if(项目。日期==日期str){(项目.date===dateStr){if(项目。日期===dateStr){index){data。商店。接头(索引，1)；保存()；}项目.date===dateStr){if(项目。date===dateStr){(项目。日期==日期str){if(项目。日期==日期str){(项目.date===dateStr){if(项目。日期===dateStr){index){data。商店。拼接(索引，1)；save()；}
+函数delShop函数delShopindex项目日期数据.商店.褶皱(index，1)；保存()；}如果(项目.日期==日期str){如果(项目.日期==日期str){(.日期===dateStr){如果(项目。日期===dateStr){(项目。日期==日期str){如果(项目。日期==日期str){(项目.日期===dateStr){如果(项目。日期===dateStr){指数){数据。商店。接头(索引，1)；保存()；}项目.日期===dateStr){如果(项目。日期===dateStr){(项目。日期==日期str){如果(项目。日期==日期str){(项目.日期===dateStr){如果(项目。日期===dateStr){指数){data。商店。拼接(索引，1)；保存()；}.商店.褶皱(index，1)；保存()；}如果(项目.日期==日期str){如果(项目.日期==日期str){(.日期===dateStr){如果(项目。日期===dateStr){(项目。日期==日期str){如果(项目。日期==日期str){(项目.日期===dateStr){如果(项目。日期===dateStr){。内部文本
+
+// --- 8. 渲染列表和合计 ---
+函数renderAll(){(){
+数据
+    
+// 运动
+BackgroundImage
+项目idiv项运动项
+今天
+超文本标记语言+=项.Cal；运动版+=项.Cal；+=项.Cal；运动版+=项.Cal；+=项.Cal；运动版+=项.Cal；+=项.Cal；运动版+=项.Cal；+=项.Cal；运动版+=项.Cal；+=项.Cal；运动版+=项.Cal；+=项.Cal；运动版+=项.Cal；+=项.Cal；运动版+=项.Cal；
+shopHtml+='<div class="list-item"><span>${item.name}<small style="color：#999">￥${item。价格}</small></span><按钮删</button></div>'；shopHtml+='<div class="list-item"><span>${item.NAME}<small style="color：#999">￥${item。价格}</small></span><按钮删</button></div>'；+='<div class="list-item"><span>${item.NAME}<small style="color：#999">￥${item。价格}</small></span><按钮删</button></div>'；shopHtml+='<div class="list-item"><span>${item.NAME}<small style="color：#999">￥${item。价格}</small></span><按钮删</button></div>'；<div班级=dateStr{项。+='<div class="list-item"><span>${item.name}<small style="color：#999">￥${item。价格}</small></span><按钮删</button></div>'；shopHtml+='<div class="list-item"><span>${item.NAME}<small style="color：#999">￥${item。价格}</small></span><按钮删</button></div>'；+='<div class="list-item"><span>${item.NAME}<small style="color：#999">￥${item。价格}</small></span><按钮删</button></div>'；shopHtml+='<div class="list-item"><span>${item.NAME}<small style="color：#999">￥${item。价格}</small></span><按钮删</button></div>'；<div班级=dateStr{项。+='<div class="list-item"><span>${item.name}<small style="color：#999">￥${item。价格}</small></span><按钮删</button></div>'；shopHtml+='<div class="list-item"><span>${item.NAME}<small style="color：#999">￥${item。价格}</small></span><按钮删</button></div>'；+='<div class="list-item"><span>${item.NAME}<small style="color：#999">￥${item。价格}</small></span><按钮删</button></div>'；shopHtml+='<div class="list-item"><span>${item.NAME}<small style="color：#999">￥${item。价格}</small></span><按钮删</button></div>'；<div班级=dateStr{项.'<div class="list-item"><span>${item.name}<small style="color：#999">￥${item。价格}</small></span><按钮删</button></div>'；shopHtml+='<div class="list-item"><span>${item.NAME}<small style="color：#999">￥${item。价格}</small></span><按钮删</button></div>'；+='<div class="list-item"><span>${item.NAME}<small style="color：#999">￥${item。价格}</small></span><按钮删</button></div>'；shopHtml+='<div class="list-item"><span>${item.NAME}<small style="color：#999">￥${item。价格}</small></span><按钮删</button></div>'；<div班级=dateStr{项。删<n></div>'；'<div class="list-item"><span>${item.name}<small style="color：#999">(${item.Cal}大卡)</small></span><按钮删</按钮></div>'；；'<div class="list-item"><span>${item.Name}<small style="color：#999">(${item.Cal}大卡)</small></span><按钮删</按钮></div>'；</按钮></div>'；'<div class="list-item"><span>${item.Name}<small style="color：#999">(${item.Cal}大卡)</small></span><按钮删</按钮></div>'；；'<div class="list-item"><span>${item。name}<small style="color：#999">(${item.cal}大卡)</small></span><按钮删</按钮></div>'；div>'；'<div class="list-item"><span>${item.name}<small style="color：#999">(${item.Cal}大卡)</small></span><按钮删</按钮></div>'；；'<div class="list-item"><span>${item.Name}<small style="color：#999">(${item.Cal}大卡)</small></span><按钮删</按钮></div>'；</按钮></div>'；'<div class="list-item"><span>${item.Name}<small style="color：#999">(${item.Cal}大卡)</small></span><按钮删</按钮></div>'；；'<div class="list-item"><span>${item。name}<small style="color：#999">(${item.cal}大卡)</small></span><按钮删</按钮></div>'；
+}}
+});});
+项"颜色：#999""空">今天还没运动哦</div>'；文档。getElementById(“运动列表”)。innerHTML=sportHtml||'<div class="empty">今天还没运动哦</div>'；('运动-列表')。innerHTML=sportHtml||'<div班级="空">今天还没运动哦</div>'；文档。getElementById(“运动列表”)。innerHTML=sportHtml||'<div class="empty">今天还没运动哦</div>'；(“运动列表”)。innerHTML=sportHtml||'<div班级="空">今天还没运动哦</div>'；文档。getElementById(“运动列表”)。innerHTML=sportHtml||'<div class="empty">今天还没运动哦</div>'；('运动-列表')。innerHTML=sportHtml|'<div班级="空">(“运动列表”).innerHTML=sportHtml||还没运动哦</div>'"颜色：#999""empty">今天还没运动哦</div>'；文档。getElementById(“运动列表”)。innerHTML=sportHtml||'<div班级="空">今天还没运动哦</div>'；('sport-list').innerHTML=sportHtml||'<div class="empty">今天还没运动哦</div>'；文档。getElementById(“运动列表”)。innerHTML=sportHtml||'<div班级="空">今天还没运动哦</div>'；(“运动列表”)。innerHTML=sportHtml||'<div class="empty">今天还没运动哦</div>'；文档。getElementById(“运动列表”)。innerHTML=sportHtml||'<div班级="空">今天还没运动哦</div>'；('sport-list')。innerHTML=sportHtml|'<div class="empty">(“运动列表”)。innerHTML=sportHtml||还没运动哦<；文档。得到ElementById(“运动列表”)。innerHTML=sportHtml||'<div class="empty">今天还没运动哦</div>'；('运动-列表')。innerHTML=sportHtml||'<div班级="空">今天还没运动哦</div>'；文档。getElementById(“运动列表”)。innerHTML=sportHtml||'<div class="empty">今天还没运动哦</div>'；(“运动列表”)。innerHTML=sportHtml||'<div班级="空">今天还没运动哦</div>'；文档。getElementById(“运动列表”)。innerHTML=sportHtml||'<div class="empty">今天还没运动哦</div>'；('运动-列表').innerHTML=sportHtml|今天还没运动哦</div>'；文档。getElementById(“运动列表”).innerHTML=sportHtml||'<；文档。getElementById(“运动列表”)。客栈div>'；('s端口列表').innerHTML=sportHtml||'<div class="empty">今天还没运动哦</div>'；文档。getElementById(“运动列表”).innerHTML=sportHtml||'<div class="empty">今天还没运动哦</div>'；(“运动列表”).innerHTML=sportHtml||'<div class="empty">今天还没运动哦</div>'；文档。getElementById(“运动列表”).innerHTML=sportHtml||'<div class="empty">今天还没运动哦</div>'；('sport-list').innerHTML=sportHtml|今天还没运动哦</div>'；文档。getElementById(“运动列表”)。innerHTML=sportHtml||erHTML=sportHtml||'<div class="empty">今天还没运动哦</div>'；('运动-列表').innerHTML=sportHtml||'<div班级="空">今天还没运动哦</div>'；文档。getElementById(“运动列表”)。innerHTML=sportHtml||'<div class="empty">今天还没运动哦</div>'；(“运动列表”)。innerHTML=sportHtml||'<div class="empty">今天还没运动哦</div>'；文档。getElementById(“运动列表”)。innerHTML=sportHtml||'<div class="empty">今天还没运动哦</div>'；('sport-list').innerHTML=sportHtml|今天还没运动哦<div class="empty">今天还没运动哦</div>'；'<div class="empty">今天还没运动哦</div>'；文档。getElementById(“运动列表”)。innerHTML=<div class="empty">今天还没运动哦</div>'；('sport-list').innerHTML=sportHtml||'<div class="empty">今天还没运动哦</div>'；文档。getElementById('sport-list').innerHTML=sportHtml||'<div class="empty">今天还没运动哦</div>'；(“运动列表”)。innerHTML=sportHtml||'<div class="empty">今天还没运动哦</div>'；文档。getElementById('sport-list').innerHTML=sportHtml||'<div class="empty">今天还没运动哦</div>'；('sport-list').innerHTML=sportHtml|今天还没运动哦<div class="empty">今天还没运动哦</div>'；'<div class="empty">今天还没运动哦<sportHtml||'<div class="empty">今天还没运动哦</div>'；；document.getElementById('sport-list')。innerHTML=sportHtml||'<div class="empty">今天还没运动哦</div>'；'<div class="empty">今天还没运动哦</div>'；文档。getElementById(“运动列表”)。innerHTML=sportHtml||'<div class="empty">今天还没运动哦</div>'；div>'；'<div class="empty">今天还没运动哦</div>'；文档。getElementById(“运动列表”)。innerHTML=sportHtml||'<div class="empty">今天还没运动哦</div>'；；document.getElementById('sport-list')。innerHTML=sportHtml||'<div class="empty">今天还没运动哦</div>'；'<div class="empty">今天还没div>'；；document.getElementById('sport-list')。innerHTML=sportHtml||'<div class="empty">今天还没运动哦</div>'；'<div class="empty">今天还没运动哦</div>'；文档。getElementById('sport-list')。innerHTML=sportHtml||'<div class="empty">今天还没运动哦</div>'；div>'；'<div class="empty">今天还没运动哦</div>'；文档。getElementById('sport-list')。innerHTML=sportHtml||'<div class="empty">今天还没运动哦</div>'；；document.getElementById('sport-list').innerHTML=sportHtml||'<div class="empty">今天还没运动哦</div>'；'<div class="empty">运动哦</div>'；document.getElementById(“运动列表”)。innerHTML=sportHtml||'<div class="empty">今天还没运动哦</div>'；</div>'；document.getElementById('sport-list').innerHTML = sportHtml || '<div class="empty">今天还没运动哦</div>文件。getElementById('sport-total')。内部文本='今日消耗：${SPORTOTAL}大卡'；文件。getElementById('sport-total')。内部文本='今日消耗：${SPORTOTAL}大卡'；(“运动总计”)。内部文本='今日消耗：${SPORTOTAL}大卡'；文件。getElementById('sport-total')。内部文本='今日消耗：${SPORTOTAL}大卡'；(“运动总计”)。内部文本='今日消耗：${SPORTOTAL}大卡'；文件。getElementById('sport-total')。内部文本='今日消耗：${SPORTOTAL}大卡'；(“运动总计”)。内部文本='今日消耗：${SPORTOTAL}大卡'；文件。getElementById('sport-total')。内部文本='今日消耗：${SPORTOTAL}大卡'；(“运动总计”)。内部文本='今日消耗：${SPORTOTAL}大卡'；文件。getElementById('sport-total')。内部文本=(“运动总计”)。内部文本='今日消耗：${SPORTOTA
+文件。getElementById('sport-total')。内部文本='今日消耗：${SPORTOTAL}大卡'；文件。getElementById('sport-total')。内部文本='今日消耗：${SPORTOTAL}大卡'；(“运动总计”)。内部文本='今日消耗：${SPORTOTAL}大卡'；文件。getElementById('sport-total')。内部文本='今日消耗：${SPORTOTAL}大卡'；(“运动总计”)。内部文本='今日消耗：${SPORTOTAL}大卡'；文件。getElementById('sport-total')。内部文本='今日消耗：${SPORTOTAL}大卡'；(“运动总计”)。内部文本='今日消耗：${SPORTOTAL}大卡'；文件。getElementById('sport-total')。内部文本='今日消耗：${SPORTOTAL}大卡'；(“运动总计”)。内部文本='今日消耗：${SPORTOTAL}大卡'；文件。getElementById('sport-total')。内部文本=(“运动总计”)。内部文本=L}大卡'；文件.GetElem('运动-全部的')。内部文本='今日消耗：${SPORTOTAL}大卡'；文件。getElementById('运动-全部的')。内部文本='今日消耗：${SPORTOTAL}大卡'；(“运动总计”)。 内部文本='今日消耗：${SPORTOTAL}大卡'；文件。getElementById('运动-全部的')。内部文本='今日消耗：${SPORTOTAL}大卡'；(“运动总计”)。 内部文本='今日消耗：${SPORTOTAL}大卡'；文件。getElementById('运动-全部的')。内部文本='今日消耗：${SPORTOTAL}大卡'；(“运动总计”)。 内部文本='今日消耗：${SPORTOTAL}大卡'；文件。getElementById('运动-全部的')。内部文本='今日消耗：${SPORTOTAL}大卡'；(“运动总计”)。 内部文本='今日消耗：${SPORTOTAL}大卡'；文件。getElementById('运动-全部的')。内部文本=(“运动总计”)。内部文本=entById('运动-全部的')。内部文本='今日消耗：${SPORTOTAL}大卡'；(“运动总计”)。 内部文本='今日消耗：${SPORTOTAL}大卡'；文件。getElementById('运动-全部的')。内部文本='今日消耗：${SPORTOTAL}大卡'；(“运动总计”)。 内部文本='今日消耗：${SPORTOTAL}大卡'；文件。getElementById('运动-全部的')。内部文本='今日消耗：${SPORTOTAL}大卡'；(“运动总计”)。 内部文本='今日消耗：${SPORTOTAL}大卡'；文件。getElementById('运动-全部的')。内部文本='今日消耗：${SPORTOTAL}大卡'；(“运动总计”)。 内部文本='今日消耗：${SPORTOTAL}大卡'；文件。getElementById('运动-'今日消耗：${SPORTOTAL}大卡'；(“运动总计”)。内部文本='今日消耗：${SPORTOTAL}大卡'；文件。getElementById('sport-total')；文件。getElementById(‘spo}大卡'；文件.GetElementById('运动-全部的')。内部文本='今日消耗：${SPORTOTAL}大卡'；(“运动总计”)。 内部文本='今日消耗：${SPORTOTAL}大卡'；文件。getElementById('运动-全部的')。内部文本='今日消耗：${SPORTOTAL}大卡'；(“运动总计”)。 内部文本='今日消耗：${SPORTOTAL}大卡'；文件。getElementById('运动-全部的')。内部文本='今日消耗：${SPORTOTAL}大卡'；(“运动总计”)。 内部文本='今日消耗：${SPORTOTAL}大卡'；文件。getElementById('运动-全部的')。内部文本='今日消耗：${SPORTOTAL}大卡'；(“运动总计”)。 内部文本='今日消耗：${SPORTOTAL}大卡'；文件。getElementById('运动-'今日消耗：${SPORTOTAL}大卡'；(“运动总计”)。内部文本=rt-全部的')。内部文本='今日消耗：${SPORTOTAL}大卡'；(“运动总计”)。 内部文本='今日消耗：${SPORTOTAL}大卡'；文件。getElementById('sport-total')。内部文本='今日消耗：${SPORTOTAL}大卡'；(“运动总计”)。内部文本='今日消耗：${SPORTOTAL}大卡'；文件。getElementById('sport-total')。内部文本='今日消耗：${SPORTOTAL}大卡'；(“运动总计”)。内部文本='今日消耗：${SPORTOTAL}大卡'；文件。getElementById('sport-total')。内部文本='今日消耗：${SPORTOTAL}大卡'；(“运动总计”)。内部文本='今日消耗：${SPORTOTAL}大卡'；文件。getElementById('sport-'今日消耗：${SPORTOTAL}大卡'；(“运动总计”)。内部文本='今日消耗：${SPORTOTAL}大卡'；文件。getElementById('sport-.内部文本='今日消耗：${SPORTOTAL}大卡'；(“运动总计”)。内部文本=；文件。getElementById('sport-total')；文件。getElementById(‘sport-total')。内部文本='今日消耗：${SPORTOTAL}大卡'；(“运动总计”)。内部文本='今日消耗：${SPORTOTAL}大卡'；文件。getElementById('sport-total')。内部文本='今日消耗：${SPORTOTAL}大卡'；(“运动总计”)。内部文本='今日消耗：${SPORTOTAL}大卡'；文件。getElementById('sport-total')。内部文本='今日消耗：${SPORTOTAL}大卡'；(“运动总计”)。内部文本='今日消耗：${SPORTOTAL}大卡'；文件。getElementById('sport-total')。内部文本='今日消耗：${SPORTOTAL}大卡'；(“运动总计”)。内部文本='今日消耗：${SPORTOTAL}大卡'；文件。getElementById('sport-'今日消耗：${SPORTOTAL}大卡'；(“运动总计”)。内部文本='今日消耗：${SPORTOTAL}大卡'；文件。getElementById('sport-total')。内部文本='今日消耗：${SPORTOTAL}大卡'；(“运动总计”)。内部文本='今日消耗：${SPORTOTAL}大卡'；文件。getElementById('sport-total')。内部文本='今日消耗：${SPORTOTAL}大卡‘；')。内部文本='今日消耗：${SPORTOTAL}大卡'；(“运动总计”)。内部文本='今日消耗：${SPORTOTAL}大卡'；文件。getElementById('sport-total')。内部文本='今日消耗：${SPORTOTAL}大卡'；(“运动总计”)。内部文本='今日消耗：${SPORTOTAL}大卡'；文件。getElementById('sport-total')。内部文本='今日消耗：${SPORTOTAL}大卡'；(“运动总计”)。内部文本='今日消耗：${SPORTOTAL}大卡'；文件。getElementById(的')。内部文本='今日消耗：${SPORTOTAL}大卡'；(“运动总计”)。内部文本='今日消耗：${运动Al}；文件。getElementById('sport-.内部文本='今日消耗：${SPORTOTAL}大卡'；(“运动总计”)。内部文本='今日消耗：${SPORTOTAL}大卡'；文件。getElementById('sport-total')。内部文本='今日消耗：${SPORTOTAL}大卡'；(“运动总计”)。内部文本='今日消耗：${SPORTOTAL}大卡'；文件。getElementById('sport-total')。内部文本='今日消耗：${SPORTOTAL}大卡‘；')。内部文本='今日消耗：${SPORTOTAL}大卡'；(“运动总计”)。内部文本='今日消耗：${SPORTOTAL}大卡'；文件。getElementById('sport-total')。内部文本='今日消耗：${SPORTOTAL}大卡'；(“运动总计”)。内部文本='今日消耗：${SPORTOTAL}大卡'；文件。getElementById('sport-total')。内部文本='今日消耗：${SPORTOTAL}大卡'；(“运动总计”)。内部文本='今日消耗：${SPORTOTAL}大卡'；文件。getElementById(的')。内部文本='今日消耗：${SPORTOTAL}大卡'；(“运动总计”)。内部文本=大卡'；文件.getElementById('sport-total')。内部文本='今日消耗：${SPORTOTAL}大卡'；(“运动总计”)。内部文本='今日消耗：${SPORTOTAL}大卡'；文件。getElementById('sport-total')。内部文本='今日消耗：${SPORTOTAL}大卡‘；')。内部文本='今日消耗：${SPORTOTAL}大卡'；(“运动总计”)。内部文本='今日消耗：${SPORTOTAL}大卡'；文件。getElementById('sport-total')。内部文本='今日消耗：${SPORTOTAL}大卡'；(“运动总计”)。内部文本='今日消耗：${SPORTOTAL}大卡'；文件。getElementById('sport-total')。内部文本='今日消耗：${SPORTOTAL}大卡'；(‘sport-端口总计”)。内部文本='今日消耗：${SPORTOTAL}大卡‘；')。内部文本='今日消耗：${SPORTOTAL}大卡'；文件。getElementById('sport-total')。内部文本='今日消耗：${SPORTOTAL}大卡；文件.getElementById('sport-total')。内部文本='今日消耗：${SPORTOTAL}大卡'；(“运动总计”)。内部文本='今日消耗：${SPORTOTAL}大卡'；文件。getElementById('sport-total')。内部文本='今日消耗：${SPORTOTAL}大卡‘；')。内部文本='今日消耗：${SPORTOTAL}大卡'；(“运动总计”)。内部文本='今日消耗：${SPORTOTAL}大卡'；文件。getElementById('sport-total')。内部文本='今日消耗：${SPORTOTAL}大卡'；(“运动总计”)。内部文本='今日消耗：${SPORTOTAL}大卡'；文件。getElementById('sport-total')。内部文本='今日消耗：${SPORTOTAL}大卡'；(‘sport-端口总计”)。内部文本='今日消耗：${SPORTOTAL}大卡‘；')。内部文本='今日消耗：${SPORTOTAL}大卡'；文件。getElementById('sport-total')。内部文本='今日消耗：${SPORTOTAL}大卡‘；
+    
+    // 日历 (简单显示本月哪些天有运动)// 日历 (简单显示本月哪些天有运动)// 日历 (简单显示本月哪些天有运动)// 日历 (简单显示本月哪些天有运动)// 日历 (简单显示本月哪些天有运动)// 日历 (简单显示本月哪些天有运动)// 日历 (简单显示本月哪些天有运动)// 日历 (简单显示本月哪些天有运动)// 日历 (简单显示本月哪些天有运动)// 日历 (简单显示本月哪些天有运动)// 日历 (简单显示本月哪些天有运动)// 日历 (简单显示本月哪些天有运动)// 日历 (简单显示本月哪些天有运动)// 日历 (简单显示本月哪些天有运动)// 日历 (简单显示本月哪些天有运动)// 日历 (简单显示本月哪些天有运动)// 日历 (简单显示本月哪些天有运动)// 日历 (简单显示本月哪些天有运动)// 日历 (简单显示本月哪些天有运动)// 日历 (简单显示本月哪些天有运动)// 日历 (简单显示本月哪些天有运动)// 日历 (简单显示本月哪些天有运动)// 日历 (简单显示本月哪些天有运动)// 日历 (简单显示本月哪些天有运动)// 日历 (简单显示本月哪些天有运动)// 日历 (简单显示本月哪些天有运动)// 日历 (简单显示本月哪些天有运动)// 日历 (简单显示本月哪些天有运动)// 日历 (简单显示本月哪些天有运动)// 日历 (简单显示本月哪些天有运动)// 日历 (简单显示本月哪些天有运动)// 日历 (简单显示本月哪些天有运动)月哪些天有运动)// 日历 (简单显示本月哪些天有运动)// 日历 (简单显示本月哪些天有运动)// 日历 (简单显示本月哪些天有运动)// 日历 (简单显示本月哪些天有运动)// 日历 (简单显示本月哪些天有运动)// 日历 (简单显示本月哪些天有运动)
+设calHtml="；设为calHtml="；={为(设d=1；d<=31；d++){ 为(设d=1；d<=31；d++){="；设为calHtml="；={为(设d=1；d<=31；d++){ 为(设d=1；d<=31；d++){="；设为calHtml="；={为(设d=1；d<=31；d++){ 为(设d=1；d<=31；d++){="；设为calHtml="；={为(设d=1；d<=31；d++){ 为(设d=1；d<=31；d++){="；设为calHtml="；={为(设d=1；d<=31；d++){ 为(设d=1；d<=31；d++){="；设为calHtml="；={为(设d=1；d<=31；d++){ 为(设d=1；d<=31；d++){="；设为calHtml="；={为(设d=1；d<=31；d++){ 为(设d=1；d<=31；d++){="；设为calHtml="；={为(设d=1；d<=31；d++){ 为(设d=1；d<=31；d++){="；设为calHtml="；={为(设d=1；d<=31；d++){ 为(设d=1；d<=31；d++){="；设为calHtml="；={为(设d=1；d<=31；d++){ 为(设d=1；d<=31；d++){="；设为calHtml="；={为(设d=1；d<=31；d++){ 为(设d=1；d<=31；d++){="；设为calHtml="；={为(设d=1；d<=31；d++){ 为(设d=1；d<=31；d++){="；设为calHtml="；={为(设d=1；d<=31；d++){ 为(设d=1；d<=31；d++){="；设为calHtml="；={为(设d=1；d<=31；d++){ 为(设d=1；d<=31；d++){="；设为calHtml="；={为(设d=1；d<=31；d++){ 为(设d=1；d<=31；d++){="；设为calHtml="；={为(设d=1；d<=31；d++){ 为(设d=1；d<=31；d++){
+shopHtml+='<div class="list-item"><span>${item.name}<small style="color：#999">￥${item。价格}</small></span><按钮删</button></div>'；shopHtml+='<div class="list-item"><span>${item.NAME}<small style="color：#999">￥${item。价格}</small></span><按钮删</button></div>'；+='<div class="list-item"><span>${item.NAME}<small style="color：#999">￥${item。价格}</small></span><按钮删</button></div>'；shopHtml+=为(设d=1；d<=31；d++){设d=1；d<=31；d++){(设d=1；d<=31；d++){ 为 d=1；d<=31；d++){+='<div class="list-item"><span>${item.name}<small style="colo+='<div班级="列表项"><跨度>${项.姓名}<小的风格="颜色：#999">￥${item。价格}</small></s平底锅><按钮删</button></div>'；shopHtml+='<div班级="列表项"><跨度>${项.姓名}<小的风格="颜色：#999">￥${item。价格}</small></s平底锅><按钮删</button></div>'；+='<div班级="列表项"><跨度>${项.姓名}<小的风格="颜色：#999">￥${item。价格}</small></s平底锅><按钮删</button></div>'；shopHtml+=for(设d=1；d<=31；d++){设d=1；d<=31；d++){(设d=1；d<=31；d++){ for d=1；d<=31；d++){+=R：#999">￥${item。价格}</small></span><按钮删</button></div>'；shopHtml+='<div class="list-item"><span>${item.NAME}<small style="color：#999">￥${item。价格}</small></span><按钮删</button></div>'；+='<div class="list-item"><span>${item.NAME}<small style="color：#999">￥${item。价格}</small></span><按钮删</button></div>'；shopHtml+=为(设d=1；d<=31；d++){设d=1；d<=31；d++){(设d=1；d<=31；d++){ 为 d=1；d<=31；d++){；shopHtml+='<div class="list-item"><span>${item.NAME}<small style="color：#999">￥${item。价格}</small></span><按钮删</button></div>'；+='<div class="list-item"><span>${item.NAME}<small style="color：#999">￥${item。价格}</small></span><按钮删</button></div>'；shopHtml+=为(设d=1；d<=31；d++){设d=1；d<=31；d++){(设d=1；d<=31；d++){ 为 d=1；d<=31；d++){
+经常有=数据.体育.一些(s=>s.日期.包括('${d}日'))；常量有=数据.体育.一些(s=>s.日期.包括('${d}日'))；=数据.体育.一些(s=>s.日期。包括('${d}日'))；常量有=数据.体育.一些(s=>s.日期。包括('${d}日'))；=数据.体育.一些(s=>s.日期.包括('${d}日'))；常量有=数据.体育.一些(s=>s.日期.包括('${d}日'))；=数据.体育.一些(s=>s.日期。包括('${d}日'))；常量有=数据.体育.一些(s=>s.日期。包括('${d}日'))；=数据.体育.一些(s=>s.日期.包括('${d}日'))；常量有=数据.体育.一些(s=>s.日期.包括('${d}日'))；=数据.体育.一些(s=>s.日期。包括('${d}日'))；常量有=数据.体育.一些(s=>s.日期。包括('${d}日'))；=数据.体育.一些(s=>s.日期.包括('${d}日'))；常量有=数据.体育.一些(s=>s.日期.包括('${d}日'))；=数据.体育.一些(s=>s.日期。包括('${d}日'))；常量有=数据.体育.一些(s=>s.日期。包括('${d}日'))；
+calHtml+='<div style="填充：5px0；边框半径：4px；背景：${是否有？'#007AFF'：'#eee'}；颜色：${有？ '#FFF'：'#999'}">${d}</div>'；calHtml+='<div style="填充：5px0；边框半径：4px；背景：${是否有？'#007AFF'：'#eee'}；颜色：${有？ '#fff'：'#999'}">${d}</div>'；+='<div风格="填充：5px0；边框半径：4px；背景：${是否有？'#007AFF'：'#eee'}；颜色：${有？ '#FFF'：'#999'}">${d}</div>'；calHtml+='<div style="填充：5px0；边框半径：4px；背景：${是否有？'#007AFF'：'#eee'}；颜色：${有？ '#fff'：'#999'}">${d}</div>'；+='<div风格="填充：5px0；边框半径：4px；背景：${是否有？'#007AFF'：'#eee'}；颜色：${有？ '#FFF'：'#999'}">${d}</div>'；calHtml+='<div style="填充：5px0+='<div风格="填充：5px0；边框半径：4px；背景：${是否有？'#007aff'：'#eee'}；颜色：${有？'#FFF'：'#999'}">${d}</div>'；calHtml+='<div style="填充：5px0；边框半径：4px；背景：${是否有？'#007aff'：'#eee'}；颜色：${有？'#fff'：'#999'}">${d}</div>'；+='<div风格="填充：5px0；边框半径：4px；背景：${是否有？'#007aff'：'#eee'}；颜色：${有？'#FFF'：'#999'}">${d}</div>'；calHtml+='<div style="填充：5px0；边框半径：4px；背景：${是否有？'#007aff'：'#eee'}；颜色：${有？'#fff'：'#999'}">${d}</div>'；+='<div风格="填充：5px0；边框半径：4px；背景：${是否有？'#007aff'：'#eee'}；颜色：${有？'#FFF'：'#999'}">${d}</div>'；calHtml+=；边框半径：4px；背景：${是否有？'#007aff'：'#eee'}；颜色：${有？'#fff'：'#999'}">${d}</div>'；+='<div风格="填充：5px0；边框半径：4px；背景：${是否有？'#007aff'：'#eee'}；颜色：${有？'#FFF'：'#999'}">${d}</div>'；calHtml+='<div style="填充：5px0；边框半径：4px；背景：${是否有？'#007aff'：'#eee'}；颜色：${有？'#fff'：'#999'}">${d}</div>'；#007aff'：'#eee'}；颜色：${有？'#fff'：'#999'}">${d}</div>'；+='<div风格="填充：5px0；边框半径：4px；背景：${是否有？'#007aff'：'#eee'}；颜色：${有？'#FFF'：'#999'}">${d}</div>'；calHtml+='<div style="填充：5px0；边框半径：4px；背景：${是否有？'#007aff'：'#eee'}；颜色：${有？'#fff'：'#999'}">${d}</div>'；
+    }
+文件。getElementById('运动日历').innerHTML=calHtml；文档.getElementById('运动日历').innerHTML=calHtml；('运动日历').innerHTML=calHtml；文档.getElementById('运动日历').innerHTML=calHtml；('运动日历').innerHTML=calHtml；文档.getElementById('运动日历').innerHTML=calHtml；('运动日历').innerHTML=calHtml；文档.getElementById('运动日历').innerHTML=calHtml；('运动日历').innerHTML=calHtml；文档.getElementById('运动日历').innerHTML=calHtml；('运动日历').innerHTML=calHtml；文档.getElementById('运动日历').innerHTML=calHtml；('运动日历').innerHTML=calHtml；文档.getElementById('运动日历').innerHTML=calHtml；('运动日历').innerHTML=calHtml；文档.getElementById('运动日历').innerHTML=calHtml；
+
+// 饮食// 饮食
+设foodHtml="，foodTotal=0；让foodHtml="，foodTotal=0；=数据。食物。foreach((项，我)=>{数据.食物.foreach((第项，我)=>{="，foodTotal=0；让foodHtml="，foodTotal=0；=数据。食物。foreach((项，我)=>{数据.食物.foreach((第项，我)=>{="，foodTotal=0；让foodHtml="，foodTotal=0；=数据。食物。foreach((项，我)=>{数据.食物.foreach((第项，我)=>{="，foodTotal=0；让foodHtml="，foodTotal=0；=数据。食物。foreach((项，我)=>{数据.食物.foreach((第项，我)=>{
+数据。食物。foreach((项，我)=>{数据.食物.foreach((第项，我)=>{((项，我)=>{数据.食物.foreach((第项，我)=>{((项，我)=>{数据.食物.foreach((第项，我)=>{((项，我)=>{数据.食物.foreach((第项，我)=>{
+函数delShop(指数){数据.商店。plice(index，1)；保存()；}(指数){数据.商店。plice(index，1)；保存()；}
+foodTotal+=项目。价格；foodTotal+=项目。价格；+=项目。价格；食品合计+=项目。价格；+=项目。价格；食品合计+=项目。价格；+=项目。价格；食品合计+=项目。价格；+=项目。价格；foodTotal+=项目。价格；+=项目。价格；食品合计+=项目。价格；+=项目。价格；食品合计+=项目。价格；+=项目。价格；食品合计+=项目。价格；
+foodHtml+='<div class="list-item"><span>${item.name}<small style="color：#999">￥${item。价格}</small></span><按钮删</button></div>'；foodHtml+='<div class="list-item"><span>${item+='<div班级="列表项"><跨度>${项.姓名}<小的风格="颜色：#999">￥${item。价格}</small></span><按钮删</button></div>'；foodHtml+=物</div>'；文档。getElementById('商店清单').innerHTML=shopHtml||'<div class="empty">今天还没购物</div>'；||/div>'；文档。getElementById("运动列表").innerHTML=sportHtml||'<div class="empty">今天还没运动哦</；文档。getElementById('商店清单').innerHTML=shopHtml||'<div class="empty">今天还没购物</div>'；；+='<div class="list-item"><span>${item.name}<small style="color：#999">￥${item。价格}</small></span><按钮删</button></div>'；foodHtml+='<div class="list-item"><span>${item.NAME}<small style="color：#999">￥${item。价格}</small></span><button删</button></div>'<div班级="列表项"><跨度>${item。钠n+='<div class="list-item"><span>${item.name}<small style="color：#999">￥${item。价格}</small></span><按钮删</button></div>'；foodHtml+=。name}<小的风格="颜色：#999">￥${项。删</button></div>'；+='<div班级="列表项"><跨度>${项.姓名}<小的风格="颜色：#999">￥${item。价格}</small></s平底锅><按钮删</button></div>'；foodHtml+='<div班级="列表项"><跨度>${项.姓名}<小的风格="颜色：#999">￥${item。价格}</small></s平底锅><按钮删</button></div>'<div class="list-item"><span>${item。钠n+='<div班级="列表项"><跨度>${项.姓名}<小的风格="颜色：#999">￥${item。价格}</small></s平底锅><按钮删</button></div>'；foodHtml+='<div班级="列表项"><跨度>${item。姓名}<sma；+='<divclass="list-item"><span>${item.name}<smallstyle="color：#999">￥${item.价格}</small></span><按沉甸甸地</button></div>'；foodHtml+='<divclass="list-item"><span>${item.name}<smallstyle="color：#999">￥${item.价格}</small></span><button删</button></div>'<divclass="列表项"><跨度>${项.AME}<smallstyle="颜色：#999">￥${项.删</button></div>'；}<smallstyle="color：#999">￥${item.删</button></div>'；
+}
+    });
+文件。getElementById('食物列表').innerHTML=foodHtml||'<div class="empty">今天还没记录饮食</div>'；文档。getElementById('食物列表').innerHTML=foodHtml||'<div class="empty">今天还没记录饮食</div>'；('食物列表').innerHTML=foodHtml||'<div class="empty">今天还没记录饮食</div>'；文档。getElementById('食物列表').innerHTML=foodHtml||'<div class="empty">今天还没记录饮食</div>'；('食物列表').innerHTML=foodHtml||'<div class="empty">今天还没记录饮食</div>'；文档。getElementById('食物列表').innerHTML=foodHtml||'<div class="empty">今天还没记录饮食</div>'；('食物列表').innerHTML=foodHtml||'<div class="empty">今天还没记录饮食</div>'；文档。getElementById('食物列表').innerHTML=foodHtml||'<div class="empty">今天还没记录饮食</div>'；
+文件。getElementById('食物总计')。内部文本='今日合计：￥${foodTotal}'；文件。getElementById('食物总计')。内部文本='今日合计：￥${foodTotal}'；('食物总计')。内部文本='今日合计：￥${foodTotal}'；文件。getElementById('食物总计')。内部文本='今日合计：￥${foodTotal}'；('食物总计')。内部文本='今日合计：￥${foodTotal}'；文件。getElementById('食物总计')。内部文本='今日合计：￥${foodTotal}'；('食物总计')。内部文本='今日合计：￥${foodTotal}'；文件。getElementById('食物总计')。内部文本='今日合计：￥${foodTotal}'；
+
+//购买// 购物
+让shopHtml="，shopTotal=0；让shopHtml="，shopTotal=0；=数据。商店。foreach((第项，我)=>{数据.商店.foreach((项，我)=>{="，shopTotal=0；让shopHtml="，shopTotal=0；=数据。商店。foreach((第项，我)=>{数据.商店.foreach((项，我)=>{
+数据。商店。foreach((第项，我)=>{数据.商店.foreach((项，我)=>{((第项，我)=>{数据.商店.foreach((项，我)=>{
+如果(项目。日期==日期str){如果(项目。日期==日期str){(项目.日期===dateStr){如果(项目。日期===dateStr){(项目。日期==日期str){如果(项目。日期==日期str){(项目.日期===dateStr){如果(项目。日期===dateStr){
+shopTotal+=项目。价格；shopTotal+=项目。价格；+=项目。价格；shopTotal+=项目。价格；+=项目。价格；shopTotal+=项目。价格；+=项目。价格；shopTotal+=项目。价格；
+shopHtml+='<div class="list-item"><span>${item.name}<small style="color：#999">￥${item。价格}</small></span><按钮删</button></div>'；shopHtml+='<div class="list-item"><span>${item.NAME}<small style="color：#999">￥${item。价格}</small></span><按钮删</button></div>'；+='<div class="list-item"><span>${item.NAME}<small style="color：#999">￥${item。价格}</small></span><按钮删</button></div>'；shopHtml+='<div class="list-item"><span>${item.NAME}<small style="color：#999">￥${item。价格}</small></span><按钮删</button></div>'；<div班级="list-ite+='<div class="列表-项"><span>${item.name}<small style="color：#999">￥${item。价格}</small></span><按钮删</button></div>'；shopHtml+='<div班级="列表-项"><span>${item.NAME}<small style="color：#999">￥${item。价格}</small></span><按钮删</button></div>'；+='<div班级="列表-项"><span>${item.NAME}<small style="color：#999">￥${item。价格}</small></span><按钮删</button></div>'；shopHtml+='<div班级="列表-项"><span>${item.NAME}<small style="color：#999">￥${item。价格}</small></span><按钮删</button></div>'；<div class="列表-项"><span>${item.NAME}<small style="color：#999">￥${item。价格}</small></span><按钮删</button></div>'；><span>${物料。name}<small style="color：#999">￥${item。价格}</small></span><按钮删</button></div>'；
+}}
+});});
+文件。getElementById('商店清单').innerHTML=shopHtml||'<div class="empty">今天还没购物</div>'；文档。getElementById('商店清单').innerHTML=shopHtml||'<div class="empty">今天还没购物</div>'；('商店清单').innerHTML=shopHtml||'<div class="empty">今天还没购物</div>'；文档.getElementById('商店清单').innerHTML=shopHtml||'<div class="empty">今天还没购物</div>'；('商店清单').innerHTML=shopHtml||'<div class="empty">今天还没购物</div>'；文档。getElementById('商店清单').innerHTML=shopHtml||'<div class="empty">今天还没购物</div>'；('商店清单').innerHTML=shopHt('商店清单').innerHTML=shopHtml||'<div class="empty">今天还没购物</div>'；文档。getElementById('商店清单').innerHTML=shopHtml||'<div class="empty">今天还没购物</div>'；('商店清单').innerHTML=shopHtml||'<div class="empty">今天还没购物</div>'；文档。getElementById('商店清单').innerHTML=shopHtml||'<div class="empty">今天还没购物</div>'；('商店清单').innerHTML=shopHtml||'<div class="empty">今天还没购物</div>'；文档。getElementById('商店清单').innerHTML=shopHtml||'<div class="empty">今天还没购物</div>'；('商店清单').innerHTML=毫升||'<div class="empty">今天还没购物</div>'；文档。getElementById('商店清单').innerHTML=shopHtml||'<div class="empty">今天还没购物</div>'；||/div>'；文档。getElementById("运动列表").innerHTML=sportHtml||'<div class="empty">今天还没运动哦</；文档。getElementById('商店清单').innerHTML=shopHtml||'<div class="empty">今天还没购物</div>'；
+文件。getElementById('Shop-total')。内部文本='今日合计：￥${shopTotal}'；文件。getElementById('Shop-total')。内部文本='今日合计：￥${shopTotal}'；('Shop-total')。内部文本='今日合计：￥${shopTotal}'；文件。getElementById('Shop-total')。内部文本='今日合计：￥${shopTotal}'；('Shop-total')。内部文本='今日合计：￥${shopTotal}'；文件。getElementById('Shop-total')。内部文本='今日合计：￥${shopTotal}'；('Shop-total')。内部文本='今日合计：￥${shopTotal}'；文件。getElementById('Shop-total')。内部文本='今日合计：￥${shopTotal}'；('Shop-total')。内部文本='今日合计：￥${shopTotal}'；文件。getElementById('Shop-total')。内部文本=。内部文本；(“车间总计”)。内部文本='('商店-全部的')。内部文本='今日合计：￥${shopTotal}'；文件。getElementById('商店-全部的')。内部文本='今日合计：￥${shopTotal}'；('商店-全部的')。内部文本='今日合计：￥${shopTotal}'；文件。getElementById('商店-全部的')。内部文本='今日合计：￥${shopTotal}'；('商店-全部的')。内部文本='今日合计：￥${shopTotal}'；文件。getElementById('商店-全部的')。内部文本='今日合计：￥${shopTotal}'；('商店-全部的')。内部文本='今日合计：￥${shopTotal}'；文件。getElementById('商店-全部的')。内部文本='今日合计：￥${shopTotal}'；('商店-全部的')。内部文本='今日合计：￥${shopTotal}'；文件。getElementById('商店-全部的')。内部文本=。内部文本；(“车间总计”)。内部文本=今日合计：￥${shopTotal}'；文件。getElementById('Shop-total')。内部文本='今日合计：￥${shopTotal}'；('Shop-total')。内部文本='今日合计：￥${shopTotal}'；文件。getElementById('Shop-total')。内部文本='今日合计：￥${shopTotal}'；('Shop-total')。内部文本='今日合计：￥${shopTotal}'；文件。getElementById('Shop-total')。内部文本='今日合计：￥${shopTotal}'；；文件。getElementById('Shop-total')。内部文本='今日合计：￥${shopTotal}'；('Shop-total')。内部文本='今日合计：￥${shopTotal}'；文件。getElementById('Shop-total')。内部文本='今日合计：￥${shopTotal}'；('Shop-total')。内部文本='今日合计：￥${shopTotal}'；文件。getElementById('Shop-total')。内部文本='今日合计：￥${shopTotal}'；
+'今日合计：￥${shopTotal}'
+
+renderAll()；renderAll()；()；renderAll()；()；renderAll()；()；renderAll()；()；renderAll()；()；renderAll()；()；renderAll()；()；renderAll()；()；renderAll()；()；renderAll()；()；renderAll()；()；renderAll()；()；renderAll()；()；renderAll()；()；renderAll()；()；renderAll()；
+<
+<
+<
