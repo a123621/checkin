@@ -1,0 +1,757 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+<meta name="theme-color" content="#ffffff">
+<title>我的打卡</title>
+<style>
+  /* ==================== ① CSS 变量与主题层 ==================== */
+  :root {
+    --theme-rgb: 255, 107, 129; /* 默认主题色 */
+    --theme-alpha: 0.85;
+    --theme: rgba(var(--theme-rgb), var(--theme-alpha));
+    --theme-solid: rgb(var(--theme-rgb));
+    --theme-soft: rgba(var(--theme-rgb), 0.15);
+    --theme-glow: rgba(var(--theme-rgb), 0.4);
+    --bg-dim: 0.25; /* 背景遮罩透明度 */
+    
+    --text-primary: #ffffff;
+    --text-secondary: rgba(255, 255, 255, 0.7);
+    --dot-off: rgba(255, 255, 255, 0.3);
+
+    --radius-lg: 28px;
+    --radius-md: 20px;
+    --radius-sm: 12px;
+  }
+
+  /* ==================== ② Reset 与基础排版 ==================== */
+  * { box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; }
+  html, body { height: 100%; overflow: hidden; }
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, "PingFang SC", "Microsoft YaHei", sans-serif;
+    color: var(--text-primary);
+    background-color: #1a1a1a; /* 默认底色 */
+    display: flex;
+    flex-direction: column;
+    height: 100dvh;
+    position: relative;
+  }
+
+  /* 背景层 */
+  #bg-layer {
+    position: fixed; top: 0; left: 0; width: 100%; height: 100%; z-index: 0;
+    background-size: cover; background-position: center;
+    transition: background-image 0.3s ease;
+  }
+  #bg-dim {
+    position: fixed; top: 0; left: 0; width: 100%; height: 100%; z-index: 0;
+    background: rgba(0,0,0, var(--bg-dim)); pointer-events: none;
+  }
+
+  /* ==================== ③ 布局骨架 ==================== */
+  #app { position: relative; z-index: 1; display: flex; flex-direction: column; height: 100%; width: 100%; max-width: 480px; margin: 0 auto; }
+  
+  header {
+    padding-top: env(safe-area-inset-top);
+    padding: 24px 16px 10px;
+    display: flex; justify-content: center; align-items: center;
+    position: relative;
+  }
+  
+  .nav-text {
+    font-size: 22px; letter-spacing: 2px; cursor: pointer;
+    padding: 8px 16px; border-radius: 12px;
+    transition: all 0.2s;
+    text-shadow: 0 2px 8px rgba(0,0,0,0.3);
+  }
+  .nav-text:active { transform: scale(0.92); }
+  .nav-text.active { color: var(--theme-solid); }
+  .nav-text.active::after {
+    content: ''; display: block; width: 20px; height: 3px; border-radius: 2px;
+    background: var(--theme-solid); margin: 4px auto 0;
+  }
+
+  /* 内容区 */
+  #main-wrap { flex: 1; position: relative; overflow: hidden; }
+  #main-content { position: absolute; inset: 0; overflow-y: auto; padding: 16px; padding-bottom: 90px; -webkit-overflow-scrolling: touch; }
+
+  /* ==================== ④ 通用组件 ==================== */
+  .card {
+    background: rgba(255, 255, 255, 0.12);
+    border: 1px solid rgba(255, 255, 255, 0.2);
+    border-radius: var(--radius-md);
+    padding: 16px;
+    margin-bottom: 16px;
+    backdrop-filter: blur(10px);
+    -webkit-backdrop-filter: blur(10px);
+  }
+
+  /* 悬浮按钮 */
+  .fab {
+    position: absolute; right: 20px; bottom: 20px;
+    width: 56px; height: 56px; border-radius: 50%;
+    background: var(--theme-solid); color: #fff;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 28px; font-weight: 300;
+    box-shadow: 0 4px 16px var(--theme-glow);
+    border: none; cursor: pointer; z-index: 10;
+    transition: transform 0.2s;
+  }
+  .fab:active { transform: scale(0.9); }
+
+  /* ==================== ⑤ 日历样式 ==================== */
+  #calendar-card {
+    background: rgba(255, 255, 255, 0.16);
+    backdrop-filter: blur(18px) saturate(140%);
+    -webkit-backdrop-filter: blur(18px) saturate(140%);
+    border: 1px solid rgba(255, 255, 255, 0.3);
+    border-radius: var(--radius-lg);
+    padding: 16px;
+    margin: 0 16px 16px;
+    box-shadow: 0 8px 32px rgba(0,0,0,0.2);
+  }
+  
+  .cal-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; }
+  .cal-header button { background: none; border: none; color: var(--text-primary); font-size: 20px; padding: 8px; cursor: pointer; }
+  .cal-header span { font-size: 15px; font-weight: 600; letter-spacing: 1px; }
+  
+  .cal-grid { display: grid; grid-template-columns: repeat(7, 1fr); gap: 4px; text-align: center; }
+  .cal-week { font-size: 11px; color: var(--text-secondary); margin-bottom: 8px; }
+  .cal-day {
+    display: flex; flex-direction: column; align-items: center; justify-content: center;
+    height: 44px; border-radius: 12px; cursor: pointer;
+    font-size: 14px; font-variant-numeric: tabular-nums;
+    position: relative;
+  }
+  .cal-day.not-month { opacity: 0.25; pointer-events: none; }
+  .cal-day.today { border: 1.5px solid var(--theme-solid); }
+  .cal-day.selected { background: var(--theme-solid); color: #fff; }
+  
+  .dots { display: flex; gap: 3px; height: 6px; margin-top: 2px; align-items: center; justify-content: center; }
+  .dot { width: 4px; height: 4px; border-radius: 50%; background: var(--dot-off); }
+  .dot.active { background: var(--theme-solid); }
+  .dot.active.bg-white { background: #fff; }
+
+  /* ==================== ⑥ 三个模块专属样式 ==================== */
+  /* 记录列表 */
+  .record-item {
+    display: flex; justify-content: space-between; align-items: center;
+    padding: 10px 0; border-bottom: 1px solid rgba(255,255,255,0.1);
+    font-size: 15px;
+  }
+  .record-item:last-child { border-bottom: none; }
+  .record-left { display: flex; align-items: center; gap: 10px; }
+  .record-cat-bar { width: 4px; height: 20px; border-radius: 2px; }
+  .record-del {
+    background: rgba(255,255,255,0.15); border: none; color: #fff;
+    padding: 4px 10px; border-radius: 8px; font-size: 12px; cursor: pointer;
+  }
+  .record-del:active { background: #ff3b30; }
+
+  .total-row { display: flex; justify-content: space-between; margin-top: 12px; padding-top: 10px; border-top: 1px solid rgba(255,255,255,0.2); font-weight: 600; color: var(--theme-solid); font-size: 16px; }
+  .sub-total { font-size: 12px; color: var(--text-secondary); text-align: right; margin-top: 4px; }
+  
+  .stat-chip {
+    display: inline-block; background: var(--theme-soft); color: var(--theme-solid);
+    padding: 6px 12px; border-radius: 20px; font-size: 13px; margin-bottom: 12px; font-weight: 500;
+  }
+
+  /* ==================== ⑦ 设置面板与抽屉 ==================== */
+  #settings-panel {
+    position: fixed; inset: 0; z-index: 200; background: rgba(20,20,22,0.95);
+    backdrop-filter: blur(20px); -webkit-backdrop-filter: blur(20px);
+    display: flex; flex-direction: column; padding: 24px; padding-top: env(safe-area-inset-top);
+    transform: translateY(100%); transition: transform 0.3s cubic-bezier(0.32, 0.72, 0, 1);
+  }
+  #settings-panel.open { transform: translateY(0); }
+  .settings-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 24px; }
+  .settings-header h2 { font-size: 18px; }
+  .close-btn { background: rgba(255,255,255,0.1); border: none; color: #fff; width: 36px; height: 36px; border-radius: 50%; font-size: 20px; cursor: pointer; }
+
+  .setting-item { margin-bottom: 24px; }
+  .setting-item label { display: block; font-size: 14px; color: var(--text-secondary); margin-bottom: 8px; }
+  .setting-item input[type="color"] { width: 100%; height: 44px; border: none; border-radius: 12px; background: none; cursor: pointer; }
+  .setting-item input[type="range"] { width: 100%; accent-color: var(--theme-solid); }
+  .btn-block { width: 100%; padding: 14px; background: var(--theme-solid); color: #fff; border: none; border-radius: 12px; font-size: 15px; font-weight: 600; cursor: pointer; }
+  .btn-secondary { background: rgba(255,255,255,0.15); color: #fff; }
+  
+  /* ==================== ⑧ 隐藏视图 ==================== */
+  .view { display: none; }
+  .view.active { display: block; }
+
+  /* 滚动条隐藏 */
+  ::-webkit-scrollbar { display: none; }
+</style>
+</head>
+<body>
+
+<div id="bg-layer"></div>
+<div id="bg-dim"></div>
+
+<div id="app">
+  <header>
+    <div class="nav-text active" onclick="App.switchView('sport')" id="nav-sport">𝙎𝙥𝙤𝙧𝙩</div>
+    <div class="nav-text" onclick="App.switchView('shopping')" id="nav-shopping">ᜊ( 𖦹 ˕ 𖦹 )ᜊ</div>
+    <div class="nav-text" onclick="App.switchView('diet')" id="nav-diet">𝘿𝙞𝙚𝙩</div>
+  </header>
+
+  <div id="main-wrap">
+    <!-- 运动视图 -->
+    <div id="view-sport" class="view active">
+      <div class="card">
+        <h2 style="font-size: 16px; margin-bottom: 12px;">💪 运动记录</h2>
+        <div id="sport-list"></div>
+        <div class="total-row"><span>当日合计</span><span id="sport-day-total">0 kcal</span></div>
+        <div class="sub-total" id="sport-week-total">本周合计: 0 kcal</div>
+      </div>
+      <div class="card">
+        <h2 style="font-size: 16px; margin-bottom: 12px;">📅 运动日历</h2>
+        <div id="sport-calendar-mini" style="font-size: 12px; color: var(--text-secondary);">（下一版本加入曲线图）</div>
+      </div>
+    </div>
+
+    <!-- 购物视图 -->
+    <div id="view-shopping" class="view">
+      <div class="card">
+        <h2 style="font-size: 16px; margin-bottom: 12px;">🛍️ 购物记录</h2>
+        <div id="shopping-list"></div>
+        <div class="total-row"><span>当日合计</span><span id="shopping-day-total">¥0.00</span></div>
+      </div>
+    </div>
+
+    <!-- 饮食视图 -->
+    <div id="view-diet" class="view">
+      <div class="card">
+        <div class="stat-chip" id="diet-stat">🥤 本月饮料/奶茶 0 次</div>
+        <h2 style="font-size: 16px; margin-bottom: 12px;">🍚 饮食记录</h2>
+        <div id="diet-list"></div>
+        <div class="total-row"><span>当日合计</span><span id="diet-day-total">¥0.00</span></div>
+        <div class="sub-total" id="diet-week-total">本周合计: ¥0.00</div>
+      </div>
+    </div>
+
+    <button class="fab" onclick="App.openSheet()">+</button>
+  </div>
+
+  <!-- 底部大日历（首页用） -->
+  <div id="calendar-card">
+    <div class="cal-header">
+      <button onclick="App.changeMonth(-1)">‹</button>
+      <span id="cal-month-label">2026年10月</span>
+      <button onclick="App.changeMonth(1)">›</button>
+    </div>
+    <div class="cal-grid cal-week">
+      <span>一</span><span>二</span><span>三</span><span>四</span><span>五</span><span>六</span><span>日</span>
+    </div>
+    <div class="cal-grid" id="cal-days"></div>
+  </div>
+</div>
+
+<!-- 设置面板 -->
+<div id="settings-panel">
+  <div class="settings-header">
+    <h2>⚙️ 装修与设置</h2>
+    <button class="close-btn" onclick="App.toggleSettings()">✕</button>
+  </div>
+  
+  <div class="setting-item">
+    <label>更换壁纸 (点击上传)</label>
+    <button class="btn-block btn-secondary" onclick="document.getElementById('bg-upload').click()">📷 选择图片</button>
+    <input type="file" id="bg-upload" accept="image/*" style="display:none">
+  </div>
+
+  <div class="setting-item">
+    <label>主题颜色</label>
+    <input type="color" id="theme-color-picker" value="#ff6b81">
+  </div>
+
+  <div class="setting-item">
+    <label>背景压暗程度 (防止字看不清)</label>
+    <input type="range" id="bg-dim-slider" min="0" max="0.6" step="0.05" value="0.25">
+  </div>
+
+  <div class="setting-item" style="margin-top: 40px;">
+    <button class="btn-block btn-secondary" onclick="App.exportData()">📤 导出 JSON 备份</button>
+  </div>
+  <div class="setting-item">
+    <button class="btn-block btn-secondary" onclick="document.getElementById('import-file').click()">📥 导入 JSON 备份</button>
+    <input type="file" id="import-file" accept=".json" style="display:none">
+  </div>
+</div>
+
+<script>
+// ==================== ① CONFIG ====================
+const STORAGE_KEYS = {
+  settings: 'ck_settings_v1',
+  bg: 'ck_bg_v1',
+  records: 'ck_records_v1',
+  suggest: 'ck_suggest_v1',
+  ui: 'ck_ui_v1'
+};
+
+// ==================== ② Util ====================
+const Util = {
+  formatDateKey(d) {
+    const y = d.getFullYear();
+    const m = String(d.getMonth() + 1).padStart(2, '0');
+    const day = String(d.getDate()).padStart(2, '0');
+    return `${y}-${m}-${day}`;
+  },
+  parseDateKey(str) {
+    const [y, m, d] = str.split('-').map(Number);
+    return new Date(y, m - 1, d);
+  },
+  getWeekRange(dateStr) {
+    const d = this.parseDateKey(dateStr);
+    const day = d.getDay() || 7; // 周一=1...周日=7
+    const monday = new Date(d);
+    monday.setDate(d.getDate() - day + 1);
+    const range = [];
+    for (let i = 0; i < 7; i++) {
+      const dd = new Date(monday);
+      dd.setDate(monday.getDate() + i);
+      range.push(this.formatDateKey(dd));
+    }
+    return range;
+  },
+  getMonthKey(dateStr) {
+    return dateStr.substring(0, 7); // YYYY-MM
+  },
+  formatMoney(n) {
+    return '¥' + n.toFixed(2);
+  }
+};
+
+// ==================== ③ Store ====================
+const Store = {
+  data: { records: { sport: {}, shopping: {}, diet: {} }, suggest: { sport: {}, shopping: {}, diet: {} } },
+  
+  load() {
+    try {
+      const rec = localStorage.getItem(STORAGE_KEYS.records);
+      if (rec) this.data.records = JSON.parse(rec);
+      const sug = localStorage.getItem(STORAGE_KEYS.suggest);
+      if (sug) this.data.suggest = JSON.parse(sug);
+    } catch (e) { console.error('加载数据失败', e); }
+  },
+  
+  saveRecords() {
+    try { localStorage.setItem(STORAGE_KEYS.records, JSON.stringify(this.data.records)); } catch (e) { alert('存储空间已满'); }
+  },
+  saveSuggest() {
+    try { localStorage.setItem(STORAGE_KEYS.suggest, JSON.stringify(this.data.suggest)); } catch (e) {}
+  },
+  
+  addRecord(module, dateKey, record) {
+    if (!this.data.records[module][dateKey]) this.data.records[module][dateKey] = [];
+    this.data.records[module][dateKey].push(record);
+    this.saveRecords();
+    this.updateSuggest(module, record.name);
+  },
+  
+  deleteRecord(module, dateKey, id) {
+    const list = this.data.records[module][dateKey];
+    if (!list) return;
+    const idx = list.findIndex(r => r.id === id);
+    if (idx > -1) {
+      list.splice(idx, 1);
+      if (list.length === 0) delete this.data.records[module][dateKey];
+      this.saveRecords();
+    }
+  },
+  
+  updateSuggest(module, name) {
+    if (!name) return;
+    if (!this.data.suggest[module]) this.data.suggest[module] = {};
+    if (!this.data.suggest[module][name]) this.data.suggest[module][name] = { count: 0, last: 0 };
+    this.data.suggest[module][name].count++;
+    this.data.suggest[module][name].last = Date.now();
+    this.saveSuggest();
+  },
+  
+  getSuggest(module, query) {
+    const list = this.data.suggest[module] || {};
+    const arr = Object.keys(list).map(k => ({ name: k, ...list[k] }));
+    arr.sort((a, b) => b.count - a.count || b.last - a.last);
+    if (query) return arr.filter(item => item.name.includes(query));
+    return arr;
+  }
+};
+
+// ==================== ④ Theme ====================
+const Theme = {
+  settings: { themeRGB: '255, 107, 129', themeAlpha: 0.85, bgDim: 0.25, activeView: 'sport' },
+  
+  load() {
+    try {
+      const s = localStorage.getItem(STORAGE_KEYS.settings);
+      if (s) this.settings = { ...this.settings, ...JSON.parse(s) };
+    } catch(e) {}
+    this.apply();
+  },
+  
+  save() {
+    try { localStorage.setItem(STORAGE_KEYS.settings, JSON.stringify(this.settings)); } catch(e) {}
+  },
+  
+  apply() {
+    const root = document.documentElement.style;
+    root.setProperty('--theme-rgb', this.settings.themeRGB);
+    root.setProperty('--theme-alpha', this.settings.themeAlpha);
+    root.setProperty('--bg-dim', this.settings.bgDim);
+  },
+  
+  setTheme(hex) {
+    const rgb = this.hexToRgb(hex);
+    if (rgb) {
+      this.settings.themeRGB = `${rgb.r}, ${rgb.g}, ${rgb.b}`;
+      this.apply(); this.save();
+    }
+  },
+  
+  hexToRgb(hex) {
+    const result = /^#?([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i.exec(hex);
+    return result ? { r: parseInt(result[1], 16), g: parseInt(result[2], 16), b: parseInt(result[3], 16) } : null;
+  }
+};
+
+// ==================== ⑤ Background ====================
+const Background = {
+  init() {
+    try {
+      const bg = localStorage.getItem(STORAGE_KEYS.bg);
+      if (bg) document.getElementById('bg-layer').style.backgroundImage = `url(${bg})`;
+    } catch(e) {}
+    
+    // 设置滑块的值
+    document.getElementById('bg-dim-slider').value = Theme.settings.bgDim;
+    document.getElementById('theme-color-picker').value = `#${Theme.settings.themeRGB.split(',').map(n => parseInt(n).toString(16).padStart(2,'0')).join('')}`;
+    
+    // 监听背景上传
+    const input = document.getElementById('bg-upload');
+    input.addEventListener('change', async (e) => {
+      const file = e.target.files[0];
+      if (!file) return;
+      if (!file.type.startsWith('image/')) return alert('请选择图片文件');
+      if (file.size > 20 * 1024 * 1024) return alert('图片过大，请选择 20MB 以内的图片');
+      
+      try {
+        const dataURL = await this.compressImage(file);
+        localStorage.setItem(STORAGE_KEYS.bg, dataURL);
+        document.getElementById('bg-layer').style.backgroundImage = `url(${dataURL})`;
+        alert('壁纸已更新！');
+      } catch (err) {
+        alert('图片处理失败，请重试');
+      }
+      input.value = ''; // 允许重复选同一个文件
+    });
+  },
+  
+  compressImage(file) {
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.readAsDataURL(file);
+      reader.onload = (e) => {
+        const img = new Image();
+        img.src = e.target.result;
+        img.onload = () => {
+          const canvas = document.createElement('canvas');
+          const ctx = canvas.getContext('2d');
+          let w = img.width, h = img.height;
+          const maxDim = 1280;
+          
+          if (w > maxDim || h > maxDim) {
+            if (w > h) { h = Math.round(h * maxDim / w); w = maxDim; }
+            else { w = Math.round(w * maxDim / h); h = maxDim; }
+          }
+          
+          canvas.width = w; canvas.height = h;
+          ctx.drawImage(img, 0, 0, w, h);
+          
+          // 质量阶梯
+          let quality = 0.75;
+          let dataURL = canvas.toDataURL('image/jpeg', quality);
+          while (dataURL.length > 320000 && quality > 0.4) {
+            quality -= 0.1;
+            dataURL = canvas.toDataURL('image/jpeg', quality);
+          }
+          resolve(dataURL);
+        };
+        img.onerror = reject;
+      };
+      reader.onerror = reject;
+    });
+  }
+};
+
+// ==================== ⑥ Calendar ====================
+const Calendar = {
+  currentMonth: new Date(),
+  selectedDate: Util.formatDateKey(new Date()),
+  
+  init() {
+    this.render();
+  },
+  
+  changeMonth(delta) {
+    this.currentMonth.setMonth(this.currentMonth.getMonth() + delta);
+    this.render();
+  },
+  
+  render() {
+    const y = this.currentMonth.getFullYear();
+    const m = this.currentMonth.getMonth();
+    document.getElementById('cal-month-label').innerText = `${y}年${m + 1}月`;
+    
+    const firstDay = new Date(y, m, 1);
+    const daysInMonth = new Date(y, m + 1, 0).getDate();
+    let startDay = firstDay.getDay(); // 0=周日
+    startDay = startDay === 0 ? 7 : startDay; // 1=周一...7=周日
+    
+    const grid = document.getElementById('cal-days');
+    grid.innerHTML = '';
+    const fragment = document.createDocumentFragment();
+    
+    // 补齐前面的空格
+    for (let i = 1; i < startDay; i++) {
+      const div = document.createElement('div'); div.className = 'cal-day not-month'; fragment.appendChild(div);
+    }
+    
+    const todayStr = Util.formatDateKey(new Date());
+    
+    for (let d = 1; d <= daysInMonth; d++) {
+      const dateKey = `${y}-${String(m + 1).padStart(2, '0')}-${String(d).padStart(2, '0')}`;
+      const div = document.createElement('div');
+      div.className = 'cal-day';
+      if (dateKey === todayStr) div.classList.add('today');
+      if (dateKey === this.selectedDate) div.classList.add('selected');
+      
+      // 数字
+      const num = document.createElement('span'); num.innerText = d; div.appendChild(num);
+      
+      // 圆点
+      const dotsDiv = document.createElement('div'); dotsDiv.className = 'dots';
+      const hasSport = Store.data.records.sport[dateKey] && Store.data.records.sport[dateKey].length > 0;
+      const hasShop = Store.data.records.shopping[dateKey] && Store.data.records.shopping[dateKey].length > 0;
+      const hasDiet = Store.data.records.diet[dateKey] && Store.data.records.diet[dateKey].length > 0;
+      
+      if (hasSport || hasShop || hasDiet) {
+        if (hasSport) { const dt = document.createElement('div'); dt.className = 'dot active'; dotsDiv.appendChild(dt); }
+        if (hasShop) { const dt = document.createElement('div'); dt.className = 'dot active'; dotsDiv.appendChild(dt); }
+        if (hasDiet) { const dt = document.createElement('div'); dt.className = 'dot active'; dotsDiv.appendChild(dt); }
+      } else {
+        const dt = document.createElement('div'); dt.className = 'dot'; dotsDiv.appendChild(dt);
+      }
+      div.appendChild(dotsDiv);
+      
+      div.onclick = () => {
+        this.selectedDate = dateKey;
+        this.render();
+        App.refreshAll();
+      };
+      
+      fragment.appendChild(div);
+    }
+    
+    grid.appendChild(fragment);
+    
+    // 同步更新饮食统计
+    App.updateDietStat();
+  }
+};
+
+// ==================== ⑦ Main App ====================
+const App = {
+  currentView: 'sport',
+  
+  init() {
+    Theme.load();
+    Store.load();
+    Background.init();
+    Calendar.init();
+    this.bindEvents();
+    this.refreshAll();
+  },
+  
+  bindEvents() {
+    // 主题色选择
+    document.getElementById('theme-color-picker').addEventListener('input', (e) => {
+      Theme.setTheme(e.target.value);
+    });
+    // 压暗滑块
+    document.getElementById('bg-dim-slider').addEventListener('input', (e) => {
+      Theme.settings.bgDim = parseFloat(e.target.value);
+      Theme.apply(); Theme.save();
+    });
+    // 导入文件
+    document.getElementById('import-file').addEventListener('change', (e) => {
+      const file = e.target.files[0];
+      if (!file) return;
+      const reader = new FileReader();
+      reader.onload = (ev) => {
+        try {
+          const data = JSON.parse(ev.target.result);
+          if (data.records) { Store.data.records = data.records; Store.saveRecords(); }
+          if (data.suggest) { Store.data.suggest = data.suggest; Store.saveSuggest(); }
+          alert('数据已成功导入！');
+          this.refreshAll();
+        } catch (err) { alert('文件格式错误，导入失败'); }
+      };
+      reader.readAsText(file);
+      e.target.value = '';
+    });
+  },
+  
+  switchView(view) {
+    this.currentView = view;
+    document.querySelectorAll('.view').forEach(v => v.classList.remove('active'));
+    document.getElementById('view-' + view).classList.add('active');
+    
+    document.querySelectorAll('.nav-text').forEach(n => n.classList.remove('active'));
+    document.getElementById('nav-' + view).classList.add('active');
+    
+    this.refreshAll();
+  },
+  
+  toggleSettings() {
+    document.getElementById('settings-panel').classList.toggle('open');
+  },
+  
+  changeMonth(delta) {
+    Calendar.changeMonth(delta);
+  },
+  
+  refreshAll() {
+    this.renderSport();
+    this.renderShopping();
+    this.renderDiet();
+  },
+  
+  renderSport() {
+    const date = Calendar.selectedDate;
+    const list = Store.data.records.sport[date] || [];
+    const container = document.getElementById('sport-list');
+    let html = '';
+    let dayTotal = 0;
+    list.forEach(item => {
+      dayTotal += item.kcal;
+      html += `<div class="record-item">
+        <div class="record-left"><span>🏃</span> ${item.name}</div>
+        <div style="display:flex;align-items:center;gap:10px;">
+          <span style="color:var(--theme-solid);font-weight:600;">${item.kcal} kcal</span>
+          <button class="record-del" onclick="App.deleteRecord('sport', '${date}', '${item.id}')">删</button>
+        </div>
+      </div>`;
+    });
+    container.innerHTML = html || '<div style="text-align:center;color:var(--text-secondary);padding:20px 0;">今天还没有运动记录哦</div>';
+    document.getElementById('sport-day-total').innerText = `${dayTotal} kcal`;
+    
+    // 周合计
+    const weekRange = Util.getWeekRange(date);
+    let weekTotal = 0;
+    weekRange.forEach(d => {
+      const recs = Store.data.records.sport[d] || [];
+      recs.forEach(r => weekTotal += r.kcal);
+    });
+    document.getElementById('sport-week-total').innerText = `本周合计: ${weekTotal} kcal`;
+  },
+  
+  renderShopping() {
+    const date = Calendar.selectedDate;
+    const list = Store.data.records.shopping[date] || [];
+    const container = document.getElementById('shopping-list');
+    let html = '';
+    let dayTotal = 0;
+    list.forEach(item => {
+      dayTotal += item.price;
+      html += `<div class="record-item">
+        <div class="record-left"><span>🛒</span> ${item.name}</div>
+        <div style="display:flex;align-items:center;gap:10px;">
+          <span style="color:var(--theme-solid);font-weight:600;">${Util.formatMoney(item.price)}</span>
+          <button class="record-del" onclick="App.deleteRecord('shopping', '${date}', '${item.id}')">删</button>
+        </div>
+      </div>`;
+    });
+    container.innerHTML = html || '<div style="text-align:center;color:var(--text-secondary);padding:20px 0;">今天还没有购物记录哦</div>';
+    document.getElementById('shopping-day-total').innerText = Util.formatMoney(dayTotal);
+  },
+  
+  renderDiet() {
+    const date = Calendar.selectedDate;
+    const list = Store.data.records.diet[date] || [];
+    const container = document.getElementById('diet-list');
+    const catColors = { meal: '#4CAF7D', snack: '#F0A030', drink: '#4A9BE8', feast: '#E05C5C' };
+    const catSymbols = { meal: '🍚', snack: '🍪', drink: '🥤', feast: '🍖' };
+    let html = '';
+    let dayTotal = 0;
+    list.forEach(item => {
+      dayTotal += item.price;
+      const color = catColors[item.cat] || catColors.meal;
+      const sym = catSymbols[item.cat] || catSymbols.meal;
+      html += `<div class="record-item">
+        <div class="record-left">
+          <div class="record-cat-bar" style="background:${color};"></div>
+          <span>${sym}</span> ${item.name}
+        </div>
+        <div style="display:flex;align-items:center;gap:10px;">
+          <span style="color:var(--theme-solid);font-weight:600;">${Util.formatMoney(item.price)}</span>
+          <button class="record-del" onclick="App.deleteRecord('diet', '${date}', '${item.id}')">删</button>
+        </div>
+      </div>`;
+    });
+    container.innerHTML = html || '<div style="text-align:center;color:var(--text-secondary);padding:20px 0;">今天还没有饮食记录哦</div>';
+    document.getElementById('diet-day-total').innerText = Util.formatMoney(dayTotal);
+    
+    // 周合计
+    const weekRange = Util.getWeekRange(date);
+    let weekTotal = 0;
+    weekRange.forEach(d => {
+      const recs = Store.data.records.diet[d] || [];
+      recs.forEach(r => weekTotal += r.price);
+    });
+    document.getElementById('diet-week-total').innerText = `本周合计: ${Util.formatMoney(weekTotal)}`;
+  },
+  
+  updateDietStat() {
+    // 统计本月饮料次数
+    const monthKey = Util.getMonthKey(Calendar.selectedDate);
+    let drinkCount = 0;
+    Object.keys(Store.data.records.diet).forEach(date => {
+      if (date.startsWith(monthKey)) {
+        Store.data.records.diet[date].forEach(item => {
+          if (item.cat === 'drink') drinkCount++;
+        });
+      }
+    });
+    document.getElementById('diet-stat').innerText = `🥤 本月饮料/奶茶 ${drinkCount} 次`;
+  },
+  
+  deleteRecord(module, date, id) {
+    if (confirm('确定删除这条记录吗？')) {
+      Store.deleteRecord(module, date, id);
+      this.refreshAll();
+      Calendar.render(); // 刷新圆点
+    }
+  },
+  
+  openSheet() {
+    alert('记录功能将在下一版本加入！');
+  },
+  
+  exportData() {
+    const data = { records: Store.data.records, suggest: Store.data.suggest };
+    const blob = new Blob([JSON.stringify(data)], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url; a.download = `打卡备份_${Util.formatDateKey(new Date())}.json`;
+    a.click();
+    URL.revokeObjectURL(url);
+  }
+};
+
+// ==================== 启动 ====================
+document.addEventListener('DOMContentLoaded', () => App.init());
+</script>
+</body>
+</html>
